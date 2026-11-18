@@ -53,11 +53,13 @@ track does) and answers no question in natural language; those belong to other c
 
 ## Perception as a capability of the robot
 
-The robot is controlled by a layered behavioral control architecture: a finite state machine
-(FSM) coordinates the plan of the task and activates, phase by phase, the behaviors of the action
-layer, a *behavior forest* of Behavior Trees. The capabilities of the robot (perception,
+![The perception system as an autonomous subsystem that follows the pattern of the robot's behavioral control architecture](./media/perception_fractal_architecture.drawio.svg)
+
+The robot is controlled by a layered behavioral control architecture (left): a finite state
+machine (FSM) coordinates the plan of the task and activates, phase by phase, the behaviors of the
+action layer, a *behavior forest* of Behavior Trees. The capabilities of the robot (perception,
 navigation, interaction, attention) are autonomous subsystems with a standard interface. The
-perception system is one of them, and has the same layers inside:
+perception system (right) is one of them, and has the same layers inside:
 
 | Layer | In the robot's architecture | In the perception system |
 |---|---|---|
@@ -93,7 +95,10 @@ A **detection request** is a stream: while it is open, every image produces its 
    time of the image.
 4. **End.** `stop` ends the request and its frames. Deactivating the system ends every request.
 
-A **perception task** is a goal of an action of the orchestrator:
+A **perception task** is a goal of an action of the orchestrator. The figure follows one
+`TrackObject` goal; the columns are the states of its runner.
+
+![The perception pipeline: the processing of one TrackObject goal, and of each image in the sensing node](./media/perception_pipeline.drawio.svg)
 
 1. **Goal.** It is accepted when `/perception_system` is active and a runner of that behavior is
    free (`slots_per_behavior` runners per behavior, so that several clients run the same task at
@@ -110,30 +115,7 @@ Both are explained node by node in [ARCHITECTURE.md](docs/ARCHITECTURE.md#a-dete
 
 ## The system
 
-```mermaid
-flowchart LR
-  subgraph clients[Clients]
-    B[Behaviors of the robot]
-    A[Attention system]
-    I[Interaction system]
-  end
-  subgraph ps[perception_system]
-    O["/perception_orchestrator<br/>FSM + perception behaviors"]
-    S["/perception_system<br/>requests, models, trackers,<br/>3D placement, TF frames"]
-    U["/lip_activity_detector<br/>/emotion_detector"]
-  end
-  P[(perception_server<br/>GPU computer)]
-  C[Camera] --> S
-  C --> U
-  B -- actions --> O
-  O -- requests --> S
-  A -- requests --> S
-  I -- skill speaking --> S
-  S -- activates --> U
-  S -. remote engine .-> P
-  S -- topics, TF --> clients
-  U -- /user_speaking --> I
-```
+![The nodes of the perception system, and the behavioral control architecture, the models, the camera and the skills about the user around it](./media/perception_system_architecture.drawio.svg)
 
 The orchestrator runs the FSM of each task and its perception behaviors, in `mission_executor`.
 The sensing node serves every request: it runs the models on this computer (local engine) or

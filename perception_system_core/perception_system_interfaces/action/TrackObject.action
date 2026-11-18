@@ -1,0 +1,31 @@
+# Find an object of a class and keep a TF frame on it while it is seen. If it is lost for longer
+# than lost_timeout_s, another object of the class is chosen (reacquire) or the goal ends. It runs
+# until it is cancelled or the object is lost. Served by /perception_orchestrator (the behavior
+# track_object).
+
+string class_name
+# Its base category, also searched (as in StartDetection)
+string category
+# Which object of the class: nearest (to the camera) or first (the first one confirmed)
+string selection
+# The TF frame to publish. Empty: tracked_<class>
+string frame_id
+# How long to search for the object at the start. 0: no limit
+float32 find_timeout_s
+# How long it may be out of view before it is lost. 0: 2 s
+float32 lost_timeout_s
+# When the object is lost, track another object of the class instead of ending
+bool reacquire
+# The detection model (empty: the default)
+string model
+---
+# Why it ended: cancelled, not found, lost
+string reason
+# The tracker id of the last object tracked (empty if none was found)
+string id
+---
+# SEARCHING, TRACKING or LOST
+string state
+string id
+# The object, as the detection request sees it in the last image (has_position false if unknown)
+TrackedObject object

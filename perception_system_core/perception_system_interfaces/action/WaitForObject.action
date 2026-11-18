@@ -1,0 +1,20 @@
+# Wait until at least min_count objects of a class are in view (e.g. "is someone at the door?").
+# Served by /perception_orchestrator (the behavior wait_for_object).
+
+string class_name
+# Its base category, also searched (as in StartDetection)
+string category
+# How many objects. 0: 1
+int32 min_count
+# How long to wait. 0: no limit (until cancelled)
+float32 timeout_s
+# The detection model (empty: the default)
+string model
+---
+bool found
+string reason
+# The objects in view when they were found
+TrackedObject[] objects
+---
+# How many are in view now
+int32 count

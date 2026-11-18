@@ -1,0 +1,3 @@
+# The state of the perception system, as published on /perception_system/status
+---
+PerceptionStatus status

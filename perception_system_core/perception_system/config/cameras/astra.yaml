@@ -1,0 +1,9 @@
+# The Orbbec Astra (the real Kobuki): its depth image with the calibration of its color camera.
+# The depth should be registered to the color image (the driver with depth_registration)
+perception_system:
+  ros__parameters:
+    projection:
+      estimator: depth_image
+      camera_info_topic: /color/camera_info
+      depth_image_topic: /depth/image_raw
+      camera_frame_is_optical: true

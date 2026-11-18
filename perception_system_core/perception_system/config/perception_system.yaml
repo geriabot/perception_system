@@ -1,0 +1,61 @@
+# The parameters of /perception_system, with their defaults. Every parameter is described in
+# docs/CONFIGURATION.md. The camera of the robot (image topic and 3D placement) is in
+# cameras/<camera>.yaml, loaded after this file (launch argument camera).
+perception_system:
+  ros__parameters:
+    image_topic: /image_rgb
+
+    # The detection models: on this computer (local) or in a perception server (remote)
+    engine: local
+    model: omdet                 # omdet, grounding_dino, sam3, yolo, yolo_world, color_blobs
+    model_options: ""            # YAML, e.g. "{threshold: 0.35}"
+    device: ""                   # torch device; "" = cuda if available
+    preload_model: true          # load the model on activation (else, with the first request)
+    tracker: strongsort          # default of the requests: strongsort, bytetrack or none
+    zoom_small_detections: false # detections_image: a strip with the small detections enlarged
+
+    # StrongSORT and ByteTrack (perception_detectors/tracking.py)
+    tracking:
+      max_age: 45
+      min_hits: 3
+      iou_threshold: 0.3
+      min_conf: 0.25
+      max_cos_dist: 0.25
+      max_iou_dist: 0.875
+      nn_budget: 80
+      mc_lambda: 0.98
+      ema_alpha: 0.9
+      reid_weights: osnet_x0_25_msmt17.pt
+
+    # engine: remote (docs/PERCEPTION_SERVER.md)
+    remote:
+      server_url: http://localhost:8765
+      token_env: ""
+      image_format: jpeg         # jpeg or png (lossless)
+      jpeg_quality: 90
+      timeout_s: 2.0             # per image; an image without an answer publishes no detections
+      wait_for_server_s: 60.0
+      connect_timeout_s: 600.0
+      added_latency_ms: 0.0      # tests: delay added to every image
+
+    # Topics and frames
+    default_namespace: /perception_system/requests
+    frames_namespace: /perception_system/frames
+    fixed_frame_id: odom
+    tf_lookup_timeout_ms: 1000
+    frame_period_ms: 100
+
+    # The skills in nodes of their own (perception_user), activated on request
+    skill_names: [speaking, emotion]
+    skill_nodes: [lip_activity_detector, emotion_detector]
+    skill_topics: ["/user_speaking,/lip_activity", "/user_emotion"]
+    autostart_skills: [""]
+    skill_timeout_s: 10.0
+    user_speaking_topic: /user_speaking
+    user_emotion_topic: /user_emotion
+
+    # Detection requests opened on activation, without a class: "name" or "name:namespace"
+    startup_requests: [""]
+
+    status_period_s: 1.0
+    stats_period_s: 30.0

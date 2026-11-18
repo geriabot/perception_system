@@ -1,0 +1,13 @@
+# A camera without depth (the NAO): each detection on the ray of its center, 1 m away (enough to
+# know which way to turn). The NAO stamps its images with CameraTop_frame (x forward, y left, z
+# up). Set camera_intrinsics ([fx, fy, cx, cy]) when its CameraInfo does not arrive (the NAO
+# software on ROS 2 Humble). estimator box_size estimates the distance from the size of what was
+# detected (docs/CONFIGURATION.md)
+perception_system:
+  ros__parameters:
+    projection:
+      estimator: ray
+      camera_info_topic: /camera_rgb_info
+      camera_frame_is_optical: false
+      ray_distance_m: 1.0
+      unknown_distance_m: 1.0

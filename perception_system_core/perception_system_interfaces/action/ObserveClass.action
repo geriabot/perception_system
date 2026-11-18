@@ -1,0 +1,18 @@
+# Keep track of every object of a class (or of several classes) and publish a TF frame for each
+# one, <frame_prefix>_<id> (e.g. person_3, dog_7), until the goal is cancelled. Served by
+# /perception_orchestrator (the behavior observe_class).
+
+string class_name
+# Its base category, also searched (as in StartDetection)
+string category
+# Several classes instead of class_name (each object keeps its class)
+string[] labels
+# The prefix of the frames. Empty: the class name (with _ for spaces), or "object" for labels
+string frame_prefix
+# The detection model (empty: the default)
+string model
+---
+string reason
+---
+# The objects tracked in the last image, with their position in the fixed frame
+TrackedObject[] objects

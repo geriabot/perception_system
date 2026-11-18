@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>perception_orchestrator</name>
+  <version>0.1.0</version>
+  <description>The coordination layer of the perception system: a koch2 orchestrator (perception_orchestrator) that serves the perception tasks (TrackObject, WaitForObject, ObserveClass) as actions, each run by a perception behavior in its own BehaviorRunner, and activates /perception_system in cascade</description>
+  <maintainer email="rodrigo.perez@urjc.es">Rodrigo Pérez-Rodríguez</maintainer>
+  <license>Apache-2.0</license>
+  <author email="rodrigo.perez@urjc.es">Rodrigo Pérez-Rodríguez</author>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>rclcpp</depend>
+  <depend>rclcpp_action</depend>
+  <depend>rclcpp_lifecycle</depend>
+  <depend>lifecycle_msgs</depend>
+  <depend>behaviortree_cpp</depend>
+  <depend>koch2</depend>
+  <depend>perception_system_interfaces</depend>
+  <exec_depend>perception_system_behaviors</exec_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

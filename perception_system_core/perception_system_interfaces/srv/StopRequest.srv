@@ -1,0 +1,6 @@
+# Ends an open request (detection, target frame or skill) by its name. Ending a detection request
+# also ends the target frames that follow it.
+string name
+---
+bool success
+string message

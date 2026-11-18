@@ -1,0 +1,48 @@
+# Opens a detection request, or updates the open one with the same name. While it is open, every
+# camera image is searched for its class, the detections are tracked (ids that persist across
+# images) and published on its own topics. Each request has its own class, tracker and topics, so
+# several clients use the perception system at the same time without interfering.
+
+# The name of the request, unique among the clients (e.g. "attention"). The same name updates the
+# open request: its class changes and its tracker goes on (the ids are kept), unless the model or
+# the tracker change, which start them again
+string name
+
+# The class to detect, e.g. "person in red". Empty: the images are published (detections_image)
+# with no detections, until a class is set
+string class_name
+# Optional base category of the class, without attributes, e.g. "person". It is also searched, and
+# its detections are published as the class: open-vocabulary detectors are unreliable with
+# attributes, so every object of the category is a candidate (the target is chosen afterwards).
+# Empty or equal to the class: only the class
+string category
+# Several independent classes instead of class_name and category (each detection keeps its label)
+string[] labels
+
+# Where its topics go: <output_namespace>/detections_2d, detections_3d, detections_image and
+# debug_image. Empty: /perception_system/requests/<name>. "/": the root (/detections_2d...)
+string output_namespace
+
+# What it publishes (a sum of the values below). 0: detections_2d, detections_3d and
+# detections_image
+uint8 OUTPUT_DEFAULT=0
+uint8 OUTPUT_DETECTIONS_2D=1
+uint8 OUTPUT_DETECTIONS_3D=2
+uint8 OUTPUT_DETECTIONS_IMAGE=4
+uint8 OUTPUT_DEBUG_IMAGE=8
+uint8 outputs
+
+# The detection model (omdet, grounding_dino, yolo, ...). Empty: the parameter `model`
+string model
+# Its options, as YAML (e.g. "{threshold: 0.35}"). Empty: the parameter `model_options`
+string model_options
+# strongsort, bytetrack or none (no ids). Empty: the parameter `tracker`
+string tracker
+---
+bool success
+# Why it failed, or what is detected now
+string message
+# The topics of the request (empty: not published)
+string detections_2d_topic
+string detections_3d_topic
+string detections_image_topic

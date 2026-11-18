@@ -1,0 +1,11 @@
+# The perception system as a mission of koch2: mission_executor creates the
+# orchestrator perception_orchestrator, which creates its own runners (a pool per perception
+# behavior, parameter slots_per_behavior), so behaviors is empty here
+node_name: "perception_bt_node"
+orchestrator_type: "perception_orchestrator"
+package_name: "perception_orchestrator"
+orchestrator_libraries:
+  - "libperception_orchestrator.so"
+plugin_libraries:
+  - "libperception_system_bt_nodes.so"
+behaviors: []

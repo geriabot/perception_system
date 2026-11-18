@@ -1,0 +1,17 @@
+# The detections of a class in the next camera image, without opening a request: for a question
+# such as "is there a cup in view?". No tracker: the detections have no id.
+
+string class_name
+# As in StartDetection
+string category
+string[] labels
+# Empty: the parameter `model`
+string model
+# How long to wait for the image to be processed. 0: 5 s
+float32 timeout_s
+---
+bool success
+string message
+vision_msgs/Detection2DArray detections_2d
+# Empty if the system places no detection in 3D (no projection configured)
+vision_msgs/Detection3DArray detections_3d

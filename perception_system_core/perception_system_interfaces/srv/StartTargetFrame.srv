@@ -1,0 +1,35 @@
+# Publishes TF frames at the detections of an open detection request: one tracked detection, the
+# midpoint of a group of detections of a class, or one frame per tracked detection of a class. The frame is published in a fixed frame
+# (odom), with the camera pose at the time of the image, every time the detections are seen.
+# The same name updates the open frame request. It ends with StopRequest, or when its detection
+# request ends.
+
+uint8 MODE_SINGLE=0
+uint8 MODE_GROUP=1
+uint8 MODE_EACH=2
+
+# The name of this request (e.g. "attention_target")
+string name
+# The detection request whose 3D detections it follows (it needs detections_3d)
+string detection_request
+# The TF frame to publish (e.g. "attention_point_1"). MODE_EACH: the prefix of the frames, one per
+# tracked detection, <frame_id>_<id> (e.g. person_3)
+string frame_id
+# Its parent, fixed while the robot moves. Empty: the parameter `fixed_frame_id` (odom)
+string fixed_frame_id
+
+uint8 mode
+# The class of the detections, as the detection request publishes it. MODE_EACH: empty for every
+# class of the request
+string class_name
+# MODE_SINGLE: the tracker id of the detection
+string id
+# MODE_GROUP: how many detections of the class; the first ones seen are kept, and one lost for
+# 5 images is replaced by another of the class. 0 or less: all the detections of the class
+int32 n_detections
+# MODE_GROUP: where to publish the half width of the group across the line of sight, plus half a
+# body (std_msgs/Float64, m). Empty: <the frame request's namespace>/half_width
+string half_width_topic
+---
+bool success
+string message

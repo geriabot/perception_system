@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>perception_system</name>
+  <version>0.1.0</version>
+  <description>The perception system of the robot, a lifecycle node (/perception_system): its clients open detection, target frame and skill requests; each request has its own class, tracker and topics, so several clients use it at once. Detection and tracking (perception_detectors), 3D placement (detection_3d_estimators), TF frames of targets, and the skills about the user (perception_user)</description>
+  <maintainer email="rodrigo.perez@urjc.es">Rodrigo Pérez-Rodríguez</maintainer>
+  <license>Apache-2.0</license>
+  <author email="rodrigo.perez@urjc.es">Rodrigo Pérez-Rodríguez</author>
+
+  <depend>rclpy</depend>
+  <depend>perception_system_interfaces</depend>
+  <depend>perception_detectors</depend>
+  <depend>detection_3d_estimators</depend>
+  <depend>sensor_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>vision_msgs</depend>
+  <depend>visualization_msgs</depend>
+  <depend>lifecycle_msgs</depend>
+  <depend>cv_bridge</depend>
+  <depend>tf2_ros_py</depend>
+  <exec_depend>ament_index_python</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>perception_user</exec_depend>
+  <exec_depend>perception_orchestrator</exec_depend>
+  <exec_depend>koch2</exec_depend>
+
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

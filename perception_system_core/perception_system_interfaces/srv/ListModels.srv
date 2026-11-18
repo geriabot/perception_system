@@ -1,0 +1,13 @@
+# The detection models of the perception system, and the classes of one of them
+
+# The model whose classes are wanted (empty: the default model)
+string model
+---
+# Every model that can be requested, the loaded ones and the default
+string[] models
+string[] loaded
+string default_model
+# The model asked for: whether it detects any text (open vocabulary) or only its classes
+bool open_vocabulary
+# Its classes, for a closed-set model (e.g. the 80 of COCO for yolo); empty for open vocabulary
+string[] classes

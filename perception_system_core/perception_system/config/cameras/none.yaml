@@ -1,0 +1,6 @@
+# A camera whose detections are not placed in 3D: detections_2d and detections_image only (no
+# detections_3d, no target frames)
+perception_system:
+  ros__parameters:
+    projection:
+      estimator: none

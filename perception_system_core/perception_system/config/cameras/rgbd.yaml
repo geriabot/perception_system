@@ -1,0 +1,13 @@
+# A depth camera aligned with the color image, publishing its depth and calibration on
+# /rgbd_camera/* (the TurtleBot 4 and the Unitree R1, real or simulated). The R1 and the simulated
+# Kobuki stamp their images with a body frame: camera_frame_is_optical false
+perception_system:
+  ros__parameters:
+    projection:
+      estimator: depth_image
+      camera_info_topic: /rgbd_camera/camera_info
+      depth_image_topic: /rgbd_camera/depth_image
+      camera_frame_is_optical: true
+      depth_window_px: 5
+      depth_region: 0.6
+      depth_percentile: 10.0

@@ -1,0 +1,12 @@
+# The objects that an open detection request saw in the last image it processed
+
+# The name of the detection request
+string request
+# Only the confirmed tracks (with an id)
+bool only_tracked
+---
+bool success
+string message
+# The time of the image
+builtin_interfaces/Time stamp
+TrackedObject[] objects

@@ -63,5 +63,5 @@ the orchestrator gives a free runner a tree that includes the behavior as a subt
 goal's values, and its outputs in keys of the runner; it activates the runner, reads its status
 and outputs every control cycle, and deactivates it and stops its requests when the goal ends
 ([ARCHITECTURE.md](ARCHITECTURE.md#a-perception-task)). A node that throws while the tree is
-ticked stops the whole `mission_executor` process, as in any runner of `koch2`:
-the trees use only the nodes above, with typed ports.
+ticked fails its behavior: `koch2` halts the tree and ends it with `FAILURE`, and the other
+runners of `mission_executor` go on (the goal then ends as a failed task).

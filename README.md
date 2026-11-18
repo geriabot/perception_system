@@ -391,8 +391,9 @@ its options.
   (`list_models` gives them); use an open-vocabulary model for other classes.
 - The model is slow without a GPU: use `model:=yolo device:=cpu tracker:=bytetrack`, or a
   perception server.
-- A Behavior Tree node that throws an exception stops the whole `mission_executor` (a limitation
-  of `koch2` runners): the perception behaviors use only nodes with typed ports.
+- A perception task ends with `FAILURE` and the log says `exception while ticking`: a node of its
+  tree threw an exception (e.g. a port of the wrong type in a tree of your own); `koch2` halts the
+  tree and fails the behavior, and the rest of `mission_executor` goes on.
 
 ## Credits
 

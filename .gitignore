@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+# Results of the checks (evaluation/README.md): local, not versioned
+evaluation/results/
+# Model weights downloaded at run time
+*.pt
+*.task
+*.tflite
+.pixi/

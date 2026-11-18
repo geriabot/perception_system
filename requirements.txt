@@ -1,0 +1,17 @@
+# The Python packages of the native installation (system ROS 2 Jazzy, docs/INSTALLATION.md). The
+# pixi environment does not use this file: pixi.toml pins the same versions (numpy and OpenCV come
+# from conda there).
+#
+#   pip install --break-system-packages -r src/perception_system/requirements.txt   (from <workspace>)
+numpy==1.26.4
+torch==2.7.0
+torchvision==0.22.0
+transformers==4.56.2
+timm==1.0.20
+boxmot==16.0.11
+opencv-python==4.11.0.86
+# yolo and yolo_world (AGPL-3.0)
+ultralytics==8.3.240
+# The skills about the user (perception_user)
+mediapipe==0.10.35
+pillow

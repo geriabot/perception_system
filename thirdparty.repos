@@ -1,0 +1,15 @@
+# Dependencies of perception_system that are not in the ROS distribution
+repositories:
+  # The 3D placement of the detections: a depth camera, or an estimate from a single image
+  third_party/detection_3d_estimators:
+    type: git
+    url: https://github.com/rodperex/detection_3d_estimators.git
+    version: main
+
+  # koch2, the framework of the behavioral control architecture (formerly behavior_architecture):
+  # the orchestrator (BaseOrchestrator), the behavior runners and mission_executor. Pinned to a
+  # commit of its branch main; move the pin when perception_system is validated against a newer one
+  third_party/koch2:
+    type: git
+    url: https://github.com/geriabot/koch2.git
+    version: b69a975718a893d8ab91d36cc92d49ea27610e0f

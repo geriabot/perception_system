@@ -1,0 +1,85 @@
+<?xml version="1.0"?>
+<root BTCPP_format="4">
+  <!--
+    TrackObject: find an object of a class and keep a TF frame on it while it is seen.
+
+    Plugin libraries: libperception_system_bt_nodes.so (package perception_system_behaviors)
+    Needs:            the perception system (/perception_system) active
+    Ports:            request (string, required): the name of its detection request;
+                      frame_request (string, required): the name of its target frame request;
+                      class (string, required); category (string, default "");
+                      model (string, default "": the default model);
+                      frame_id (string, required): the TF frame to publish;
+                      selection (nearest | first, default nearest);
+                      find_timeout_ms (int, required): how long to search at the start;
+                      lost_timeout_ms (int, required): how long it may be out of view;
+                      reacquire (true | false, default false): another object of the class
+                      when it is lost
+    Outputs:          id (string): the tracker id of the object;
+                      state (SEARCHING | TRACKING | LOST): TRACKING while it is in the last image
+    Result:           runs while the object is tracked; FAILURE if none is found within
+                      find_timeout_ms, or if it is lost (and no other one is found, with reacquire)
+    Usage:            <SubTree ID="TrackObject" request="tracker" frame_request="tracker_frame"
+                               class="person" frame_id="target" find_timeout_ms="10000"
+                               lost_timeout_ms="2000" reacquire="true" id="{id}" state="{state}"/>
+    The requests stay open when the tree ends or is halted: end them with StopPerception
+    (request; its target frame ends with it).
+  -->
+  <BehaviorTree ID="TrackObject">
+    <Sequence>
+      <Script code="state:='SEARCHING'; id:=''"/>
+      <StartDetection request="{request}" class="{class}" category="{category}" model="{model}"
+                      outputs="3" detections_2d_topic="{topic_2d}"
+                      detections_3d_topic="{topic_3d}"/>
+      <Timeout msec="{find_timeout_ms}">
+        <RetryUntilSuccessful num_attempts="-1">
+          <Sequence>
+            <Sleep msec="100"/>
+            <SelectDetection topic="{topic_3d}" class="{class}" policy="{selection}" id="{id}"/>
+          </Sequence>
+        </RetryUntilSuccessful>
+      </Timeout>
+      <StartTargetFrame request="{frame_request}" detection_request="{request}"
+                        frame_id="{frame_id}" class="{class}" id="{id}"/>
+      <Script code="state:='TRACKING'"/>
+      <KeepRunningUntilFailure>
+        <Fallback>
+          <!-- Seen again within lost_timeout_ms: still tracked -->
+          <Timeout msec="{lost_timeout_ms}">
+            <RetryUntilSuccessful num_attempts="-1">
+              <Sequence>
+                <Sleep msec="100"/>
+                <Fallback>
+                  <Sequence>
+                    <DetectionSeen topic="{topic_2d}" class="{class}" id="{id}"/>
+                    <Script code="state:='TRACKING'"/>
+                  </Sequence>
+                  <Sequence>
+                    <Script code="state:='LOST'"/>
+                    <AlwaysFailure/>
+                  </Sequence>
+                </Fallback>
+              </Sequence>
+            </RetryUntilSuccessful>
+          </Timeout>
+          <!-- Lost: another object of the class, if allowed -->
+          <Sequence>
+            <ScriptCondition code="reacquire=='true'"/>
+            <Timeout msec="{lost_timeout_ms}">
+              <RetryUntilSuccessful num_attempts="-1">
+                <Sequence>
+                  <Sleep msec="100"/>
+                  <SelectDetection topic="{topic_3d}" class="{class}" policy="{selection}"
+                                   id="{id}"/>
+                </Sequence>
+              </RetryUntilSuccessful>
+            </Timeout>
+            <StartTargetFrame request="{frame_request}" detection_request="{request}"
+                              frame_id="{frame_id}" class="{class}" id="{id}"/>
+            <Script code="state:='TRACKING'"/>
+          </Sequence>
+        </Fallback>
+      </KeepRunningUntilFailure>
+    </Sequence>
+  </BehaviorTree>
+</root>

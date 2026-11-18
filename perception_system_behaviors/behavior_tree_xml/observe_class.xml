@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<root BTCPP_format="4">
+  <!--
+    ObserveClass: track every object of a class (or of several classes) and publish a TF frame
+    for each one, <frame_prefix>_<id>, until the tree is halted.
+
+    Plugin libraries: libperception_system_bt_nodes.so (package perception_system_behaviors)
+    Needs:            the perception system (/perception_system) active
+    Ports:            request (string, required): the name of its detection request;
+                      frame_request (string, required): the name of its target frame request;
+                      class (string, default ""); category (string, default "");
+                      labels (string, default ""): several classes, "cup; bowl", instead of class;
+                      model (string, default "": the default model);
+                      frame_prefix (string, required)
+    Result:           runs until halted; FAILURE if a request is refused
+    Usage:            <SubTree ID="ObserveClass" request="people" frame_request="people_frames"
+                               class="person" frame_prefix="person"/>
+    The requests stay open when the tree is halted: end them with StopPerception (request; its
+    frames end with it).
+  -->
+  <BehaviorTree ID="ObserveClass">
+    <Sequence>
+      <StartDetection request="{request}" class="{class}" category="{category}"
+                      labels="{labels}" model="{model}" outputs="3"/>
+      <StartTargetFrame request="{frame_request}" detection_request="{request}"
+                        frame_id="{frame_prefix}" class="{class}" mode="each"/>
+      <KeepRunningUntilFailure>
+        <Sleep msec="1000"/>
+      </KeepRunningUntilFailure>
+    </Sequence>
+  </BehaviorTree>
+</root>

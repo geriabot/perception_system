@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+<root BTCPP_format="4">
+  <!--
+    WaitForObject: wait until at least min_count objects of a class are in view.
+
+    Plugin libraries: libperception_system_bt_nodes.so (package perception_system_behaviors)
+    Needs:            the perception system (/perception_system) active
+    Ports:            request (string, required): the name of its detection request;
+                      class (string, required); category (string, default "");
+                      model (string, default "": the default model);
+                      min_count (int, required); timeout_ms (int, required)
+    Outputs:          count (int): how many are in view
+    Result:           SUCCESS when they are in view; FAILURE after timeout_ms
+    Usage:            <SubTree ID="WaitForObject" request="door" class="person" min_count="1"
+                               timeout_ms="30000" count="{count}"/>
+    The detection request stays open when the tree ends or is halted: end it with
+    StopPerception (request).
+  -->
+  <BehaviorTree ID="WaitForObject">
+    <Sequence>
+      <StartDetection request="{request}" class="{class}" category="{category}" model="{model}"
+                      outputs="3" detections_2d_topic="{topic_2d}"/>
+      <Timeout msec="{timeout_ms}">
+        <RetryUntilSuccessful num_attempts="-1">
+          <Sequence>
+            <Sleep msec="100"/>
+            <DetectionSeen topic="{topic_2d}" class="{class}" min_count="{min_count}"
+                           count="{count}"/>
+          </Sequence>
+        </RetryUntilSuccessful>
+      </Timeout>
+    </Sequence>
+  </BehaviorTree>
+</root>

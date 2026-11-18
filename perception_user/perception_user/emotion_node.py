@@ -28,7 +28,7 @@ from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
 from sensor_msgs.msg import Image
 from std_msgs.msg import String
 
-from perception_user.models import model_file
+from perception_user.models import model_file, without_audio
 
 FACE_DETECTOR_URL = ('https://storage.googleapis.com/mediapipe-models/face_detector/'
                      'blaze_face_short_range/float16/1/blaze_face_short_range.tflite')
@@ -70,6 +70,7 @@ class EmotionDetector(LifecycleNode):
 
     def on_configure(self, state: State):
         try:
+            without_audio()
             from mediapipe.tasks import python as mp_python
             from mediapipe.tasks.python import vision as mp_vision
             from transformers import pipeline
@@ -148,6 +149,11 @@ def main(args=None):
         rclpy.spin(node)
     except (KeyboardInterrupt, ExternalShutdownException):
         pass
+    except Exception:  # noqa: B902 - re-raised unless the context has ended
+        # A callback that was running when the process was asked to stop (Ctrl+C, the end of a
+        # launch) publishes after the context has ended: not an error. Raised if it is not that
+        if rclpy.ok():
+            raise
     finally:
         node.destroy_node()
         rclpy.try_shutdown()

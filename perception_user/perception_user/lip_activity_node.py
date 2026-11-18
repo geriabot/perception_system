@@ -15,7 +15,7 @@ from sensor_msgs.msg import Image
 from std_msgs.msg import Bool, Float32
 
 from perception_user.lip_activity import LipActivity, MODEL_URL, mouth_openness
-from perception_user.models import model_file
+from perception_user.models import model_file, without_audio
 
 IMAGE_QOS = QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT,
                        history=HistoryPolicy.KEEP_LAST, depth=1)
@@ -59,6 +59,7 @@ class LipActivityDetector(LifecycleNode):
 
     def on_configure(self, state: State):
         try:
+            without_audio()
             from mediapipe.tasks import python as mp_python
             from mediapipe.tasks.python import vision as mp_vision
             options = mp_vision.FaceLandmarkerOptions(
@@ -137,6 +138,11 @@ def run(args=None):
         rclpy.spin(node)
     except (KeyboardInterrupt, ExternalShutdownException):
         pass
+    except Exception:  # noqa: B902 - re-raised unless the context has ended
+        # A callback that was running when the process was asked to stop (Ctrl+C, the end of a
+        # launch) publishes after the context has ended: not an error. Raised if it is not that
+        if rclpy.ok():
+            raise
     finally:
         node.destroy_node()
         rclpy.try_shutdown()

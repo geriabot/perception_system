@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.8)
+cmake_minimum_required(VERSION 3.10)
 project(perception_system_interfaces)
 
 find_package(ament_cmake REQUIRED)

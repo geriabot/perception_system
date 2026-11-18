@@ -24,6 +24,10 @@ roughness, and silence after `silence_secs` below it, so that a single movement 
 No face is a gap of 0. The face model is downloaded once to `~/.cache/perception_system` (or
 `$PERCEPTION_MODELS_DIR`).
 
+The skills run on a computer without a sound server too (a robot started over SSH or as a
+service): MediaPipe imports its audio tasks, whose `sounddevice` fails there, and the skills give
+it an empty one, since they use only the vision tasks (`perception_user/models.py`).
+
 It looks at the largest face (one face is tracked): with several people in view, it is not the
 user's lips unless the user is the one in front of the camera.
 

@@ -89,6 +89,7 @@ where the speaking state differs.
 |---|---|
 | `scripts/synthetic_camera.py` | The synthetic RGB-D camera, with its ground truth on `/synthetic/ground_truth` |
 | `scripts/image_camera.py` | Publishes an image file again and again on `/image_rgb`, to try a real model without a robot |
+| `scripts/face_camera.py` | A drawn face on `/image_rgb`, silent or talking (`/face_camera/talking`, `std_msgs/Bool`): the lip activity (skill `speaking`) without a camera or a person. The interaction system's integration test uses it |
 | `scripts/check_system.py`, `scripts/check_tasks.py`, `scripts/run_check.sh` | The checks of the running system |
 | `equivalence/compare_with_attention.py`, `legacy_detector.py`, `run_equivalence.sh` | The equivalence with the attention system |
 | `equivalence/compare_lip_activity.py` | The equivalence with the interaction system |

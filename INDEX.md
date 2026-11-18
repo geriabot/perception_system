@@ -41,6 +41,7 @@ of the workspace, in `pixi shell` (or a terminal prepared with `activate.sh`).
 | `bash src/perception_system/evaluation/equivalence/run_equivalence.sh` | [evaluation/README.md](evaluation/README.md#equivalence-with-the-attention-system) |
 | `python3 src/perception_system/evaluation/equivalence/compare_lip_activity.py <path>` | [evaluation/README.md](evaluation/README.md#equivalence-with-the-interaction-system) |
 | `python3 src/perception_system/evaluation/scripts/image_camera.py <image>` | [evaluation/README.md](evaluation/README.md#the-tools) |
+| `python3 src/perception_system/evaluation/scripts/face_camera.py [--talking]` | [evaluation/README.md](evaluation/README.md#the-tools) |
 
 ## Reading order
 

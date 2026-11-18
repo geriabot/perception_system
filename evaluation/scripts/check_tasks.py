@@ -127,10 +127,12 @@ class TaskChecker(Node):
                    'yolo' in models.models and not models.open_vocabulary and
                    'red' in models.classes, f'{list(models.models)}')
 
-        # TrackObject: the nearest red box is the walker
+        # TrackObject: the nearest red box is the walker. With reacquire, the task lives until it is
+        # cancelled below: the walker is hidden or leaves the view at times, and without reacquire
+        # the task would end as lost, depending on the moment of the scene
         feedbacks = []
         handle = self.send('track', TrackObject.Goal(
-            class_name='red', find_timeout_s=10.0, lost_timeout_s=2.0),
+            class_name='red', find_timeout_s=10.0, lost_timeout_s=2.0, reacquire=True),
             lambda f: feedbacks.append(f.feedback))
         self.check('TrackObject accepted', handle is not None and handle.accepted)
         time.sleep(6.0)
@@ -204,7 +206,8 @@ class TaskChecker(Node):
         self.wait(handle.cancel_goal_async())
         result = self.wait(handle.get_result_async(), 10.0)
         self.check('TrackObject: cancelled', result is not None and
-                   result.result.reason == 'cancelled')
+                   result.result.reason == 'cancelled',
+                   result.result.reason if result else 'no result')
         self.wait(observe.cancel_goal_async())
         self.wait(observe.get_result_async(), 10.0)
         time.sleep(1.5)

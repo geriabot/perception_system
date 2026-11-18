@@ -1,0 +1,68 @@
+<?xml version="1.0"?>
+<root BTCPP_format="4">
+  <!--
+    FollowPerson: find a person (or an object of a class) and keep a TF frame on them, recognizing
+    them again by their appearance when the tracker loses them; another one of the class is never
+    taken for them.
+
+    Plugin libraries: libperception_system_bt_nodes.so (package perception_system_behaviors)
+    Needs:            the perception system (/perception_system) active
+    Ports:            request (string, required): the name of its detection request;
+                      frame_request (string, required): the name of its target frame request;
+                      class (string, required: person); category (string, default "");
+                      model, model_options, tracker (string, default "": the defaults of
+                      the system);
+                      frame_id (string, required): the TF frame to publish;
+                      selection (nearest | first, default nearest): who, at the start;
+                      find_timeout_ms (int, required): how long to search at the start;
+                      lost_timeout_ms (int, required): how long they may be out of view (not
+                      recognized again)
+    Outputs:          id (string): their tracker id now (it changes when they are recognized
+                      again); state (SEARCHING | FOLLOWING | LOST)
+    Result:           runs while they are followed; FAILURE if nobody is found within
+                      find_timeout_ms, or if they are not seen for lost_timeout_ms
+    Usage:            <SubTree ID="FollowPerson" request="follow" frame_request="follow_frame"
+                               class="person" frame_id="followed_person" find_timeout_ms="10000"
+                               lost_timeout_ms="10000" id="{id}" state="{state}"/>
+    The requests stay open when the tree ends or is halted: end them with StopPerception
+    (request; its target frame ends with it).
+  -->
+  <BehaviorTree ID="FollowPerson">
+    <Sequence>
+      <Script code="state:='SEARCHING'; id:=''"/>
+      <StartDetection request="{request}" class="{class}" category="{category}" model="{model}"
+                      model_options="{model_options}" tracker="{tracker}"
+                      outputs="3" detections_3d_topic="{topic_3d}"/>
+      <Timeout msec="{find_timeout_ms}">
+        <RetryUntilSuccessful num_attempts="-1">
+          <Sequence>
+            <Sleep msec="100"/>
+            <SelectDetection topic="{topic_3d}" class="{class}" policy="{selection}" id="{id}"/>
+          </Sequence>
+        </RetryUntilSuccessful>
+      </Timeout>
+      <StartTargetFrame request="{frame_request}" detection_request="{request}"
+                        frame_id="{frame_id}" class="{class}" id="{id}" mode="follow"/>
+      <Script code="state:='FOLLOWING'"/>
+      <KeepRunningUntilFailure>
+        <Timeout msec="{lost_timeout_ms}">
+          <RetryUntilSuccessful num_attempts="-1">
+            <Sequence>
+              <Sleep msec="100"/>
+              <Fallback>
+                <Sequence>
+                  <FrameTargetSeen frame_request="{frame_request}" id="{id}"/>
+                  <Script code="state:='FOLLOWING'"/>
+                </Sequence>
+                <Sequence>
+                  <Script code="state:='LOST'"/>
+                  <AlwaysFailure/>
+                </Sequence>
+              </Fallback>
+            </Sequence>
+          </RetryUntilSuccessful>
+        </Timeout>
+      </KeepRunningUntilFailure>
+    </Sequence>
+  </BehaviorTree>
+</root>

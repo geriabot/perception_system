@@ -1,0 +1,6 @@
+# The people that the body detector saw in its last image (served by /body_detector while it is
+# active).
+---
+# false if the detector has processed no image yet
+bool available
+PersonArray people

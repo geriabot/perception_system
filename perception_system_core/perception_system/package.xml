@@ -25,6 +25,8 @@
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
   <exec_depend>perception_user</exec_depend>
+  <exec_depend>perception_body</exec_depend>
+  <exec_depend>perception_markers</exec_depend>
   <exec_depend>perception_orchestrator</exec_depend>
   <exec_depend>koch2</exec_depend>
 

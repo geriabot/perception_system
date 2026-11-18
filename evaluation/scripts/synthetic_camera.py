@@ -28,6 +28,9 @@ The scene (odom, m): a red box walking left and right 2.5 m ahead (y from -1 to 
 still at (4, 0.8), and a blue box at (3.5, -1.2), which the walker sometimes hides in part. Each
 box is 0.5 m wide and 1.7 m tall, standing on the floor: the center of its image is 0.85 m high.
 The robot turns its base by yaw_amplitude * sin(0.25 t).
+
+A box leaves the scene while its name is in the last message of /synthetic/hidden (std_msgs/String,
+JSON list of names, e.g. ["walker"]), so that a check can make an object leave and come back.
 """
 
 import argparse
@@ -59,13 +62,13 @@ WALL = 6.0
 COLORS = {'red': (220, 20, 20), 'blue': (20, 20, 220)}
 
 
-def boxes_at(t):
+def boxes_at(t, hidden=()):
     """The boxes in odom at time t (s since the start): (name, color, x, y)."""
-    return [
+    return [box for box in [
         ('walker', 'red', 2.5, -0.5 + 0.5 * math.sin(0.4 * t)),
         ('still', 'red', 4.0, 0.8),
         ('blue', 'blue', 3.5, -1.2),
-    ]
+    ] if box[0] not in hidden]
 
 
 def quaternion_yaw(yaw):
@@ -81,11 +84,11 @@ def to_camera(x, y, yaw):
     return forward, left
 
 
-def render(t, yaw):
+def render(t, yaw, hidden=()):
     rgb = np.full((HEIGHT, WIDTH, 3), 128, dtype=np.uint8)
     depth = np.full((HEIGHT, WIDTH), WALL, dtype=np.float32)
     placed = []
-    for name, color, x, y in boxes_at(t):
+    for name, color, x, y in boxes_at(t, hidden):
         forward, left = to_camera(x, y, yaw)
         if forward <= 0.3:
             continue
@@ -129,6 +132,12 @@ class SyntheticCamera(Node):
         self.create_timer(0.02, self.publish_odom)
         self.create_timer(1.0 / rate, self.publish_images)
         self.frames = 0
+        self.hidden = []
+        self.create_subscription(String, '/synthetic/hidden', self.on_hidden, 10)
+
+    def on_hidden(self, msg):
+        self.hidden = list(json.loads(msg.data or '[]'))
+        self.get_logger().info(f'Hidden: {self.hidden}')
 
     def elapsed(self, stamp):
         return (stamp - self.start).nanoseconds / 1e9
@@ -169,7 +178,8 @@ class SyntheticCamera(Node):
         if self.duration > 0 and t > self.duration:
             raise SystemExit
         yaw = self.yaw(t)
-        rgb, depth = render(t, yaw)
+        hidden = list(self.hidden)
+        rgb, depth = render(t, yaw, hidden)
         header_stamp = now.to_msg()
         info = CameraInfo(width=WIDTH, height=HEIGHT)
         info.header.stamp, info.header.frame_id = header_stamp, 'camera_optical'
@@ -186,7 +196,7 @@ class SyntheticCamera(Node):
         self.rgb_pub.publish(image)
         self.truth_pub.publish(String(data=json.dumps({
             'stamp': [header_stamp.sec, header_stamp.nanosec], 'frame': self.frames, 'yaw': yaw,
-            'boxes': [{'name': n, 'color': c, 'x': x, 'y': y} for n, c, x, y in boxes_at(t)]})))
+            'boxes': [{'name': n, 'color': c, 'x': x, 'y': y} for n, c, x, y in boxes_at(t, hidden)]})))
         self.frames += 1
 
 

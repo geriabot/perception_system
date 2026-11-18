@@ -45,12 +45,21 @@ perception_system:
     tf_lookup_timeout_ms: 1000
     frame_period_ms: 100
 
-    # The skills in nodes of their own (perception_user), activated on request
-    skill_names: [speaking, emotion]
-    skill_nodes: [lip_activity_detector, emotion_detector]
-    skill_topics: ["/user_speaking,/lip_activity", "/user_emotion"]
+    # Target frames in MODE_FOLLOW: the object recognized again by its appearance (osnet, the
+    # re-identification network of StrongSORT, or color), above min_similarity (0: the default
+    # of the appearance, 0.7 for osnet, 0.85 for color)
+    follow:
+      appearance: osnet
+      min_similarity: 0.0
+
+    # The skills in nodes of their own (perception_user, perception_body, perception_markers),
+    # activated on request
+    skill_names: [lip_activity, facial_expression, body, markers]
+    skill_nodes: [lip_activity_detector, emotion_detector, body_detector, marker_detector]
+    skill_topics: ["/user_speaking,/lip_activity", "/user_emotion",
+                   "/people/body,/people/events", "/markers/detections"]
     autostart_skills: [""]
-    skill_timeout_s: 10.0
+    skill_timeout_s: 30.0         # a skill node loads its model when it is configured
     user_speaking_topic: /user_speaking
     user_emotion_topic: /user_emotion
 

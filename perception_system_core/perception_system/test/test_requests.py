@@ -76,7 +76,7 @@ def test_conflicts():
     open_requests = {
         'a': rq.DetectionRequest('a', RequestConfig('omdet', {}, 'none'), 7, ''),
         'f': rq.FrameRequest('f', 'a', 'target', 'odom', 0, 'person', '1', 0, ''),
-        's': rq.SkillRequest('s', 'speaking'),
+        's': rq.SkillRequest('s', 'lip_activity'),
     }
     rq.check_conflicts(open_requests, 'a', rq.DetectionRequest, namespace='')   # itself
     with pytest.raises(rq.RequestError, match='publishes on /'):

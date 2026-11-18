@@ -202,18 +202,31 @@ class Checker(Node):
         self.check('images_only: images without a class', len(image_stamps) >= 5,
                    f'{len(image_stamps)} images')
 
-        errors = []
+        errors, details = [], []
+        boxes_2d = {(m.header.stamp.sec, m.header.stamp.nanosec): {d.id: d for d in m.detections}
+                    for m in red2d}
         for msg in self.recorded('/detections_3d'):
             truth = self.truth_at(msg.header.stamp)
             if truth is None:
                 continue
             for d in msg.detections:
+                box = boxes_2d.get((msg.header.stamp.sec, msg.header.stamp.nanosec), {}).get(d.id)
+                if box is not None:
+                    left = box.bbox.center.position.x - box.bbox.size_x / 2
+                    right = box.bbox.center.position.x + box.bbox.size_x / 2
+                    if left <= 1.0 or right >= 638.0:
+                        continue   # cut by the image: its center is not the box's
                 p = d.bbox.center.position
                 point = self.in_odom(msg.header, p.x, p.y, p.z)
-                errors.append(self.nearest_box(truth, point, 'red')[0])
+                error, name = self.nearest_box(truth, point, 'red')
+                errors.append(error)
+                details.append(f'{name} {error:.3f}')
         self.check('3D placement against the ground truth (depth camera)', errors and
                    max(errors) < TOLERANCE_M,
-                   f'{len(errors)} detections, max error {max(errors or [0]):.3f} m')
+                   f'{len(errors)} detections (those cut by the image left out), max error '
+                   f'{max(errors or [0]):.3f} m'
+                   + ('' if not errors or max(errors) < TOLERANCE_M else
+                      f'; {[x for x in details if float(x.split()[1]) >= TOLERANCE_M][:5]}'))
 
         # Target frames: the still red box, and the group of both red boxes
         last = red2d[-1]
@@ -287,23 +300,23 @@ class Checker(Node):
 
         if skills:
             try:
-                reply = self.client.start_skill('dialogue', 'speaking', timeout_s=60.0)
+                reply = self.client.start_skill('dialogue', 'lip_activity', timeout_s=60.0)
                 self.record('/lip_activity', Float32)
                 time.sleep(2.0)
                 ratios = self.recorded('/lip_activity')
                 status = self.client.status()
-                self.check('skill speaking: its node activated on request',
-                           'speaking' in status.active_skills and bool(ratios),
+                self.check('skill lip_activity: its node activated on request',
+                           'lip_activity' in status.active_skills and bool(ratios),
                            f'{reply.message}; {len(ratios)} lip ratios')
                 self.client.stop('dialogue')
                 time.sleep(1.0)
                 since = time.monotonic()
                 time.sleep(1.0)
-                self.check('skill speaking: its node deactivated after the last request',
-                           'speaking' not in self.client.status().active_skills and
+                self.check('skill lip_activity: its node deactivated after the last request',
+                           'lip_activity' not in self.client.status().active_skills and
                            not self.recorded('/lip_activity', since))
             except PerceptionError as exc:
-                self.check('skill speaking', False, str(exc))
+                self.check('skill lip_activity', False, str(exc))
 
         # Life cycle: deactivating ends every request
         ok = self.change_state(Transition.TRANSITION_DEACTIVATE)
@@ -321,7 +334,7 @@ def main():
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--report', default='', help='write the results to this JSON file')
     parser.add_argument('--skills', action='store_true',
-                        help='also check the skill speaking (launch with user:=true)')
+                        help='also check the skill lip_activity (launch with user:=true)')
     args, _ = parser.parse_known_args()
     rclpy.init()
     node = Checker()

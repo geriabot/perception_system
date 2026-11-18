@@ -19,14 +19,17 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <vector>
 
 #include "behaviortree_cpp/action_node.h"
 #include "behaviortree_cpp/condition_node.h"
 #include "rclcpp/rclcpp.hpp"
+#include "tf2_ros/buffer.h"
 #include "vision_msgs/msg/detection2_d_array.hpp"
 #include "vision_msgs/msg/detection3_d_array.hpp"
 
 #include "perception_system_behaviors/AsyncServiceCall.hpp"
+#include "perception_system_interfaces/msg/person_array.hpp"
 #include "perception_system_interfaces/srv/detect_once.hpp"
 #include "perception_system_interfaces/srv/start_detection.hpp"
 #include "perception_system_interfaces/srv/start_skill.hpp"
@@ -263,6 +266,110 @@ public:
 private:
   rclcpp::Node::SharedPtr node_;
   LatestMessage<vision_msgs::msg::Detection3DArray> detections_;
+};
+
+/**
+ * Whether the object of a target frame request in MODE_FOLLOW is seen: the latest message of
+ * <frames namespace>/<frame_request>/tracked_ids, received less than max_age_ms ago, has its id
+ * (the id changes when the object is recognized again). Outputs the current id.
+ */
+class FrameTargetSeen : public BT::ConditionNode
+{
+public:
+  FrameTargetSeen(const std::string & name, const BT::NodeConfig & config);
+  static BT::PortsList providedPorts();
+  BT::NodeStatus tick() override;
+
+private:
+  rclcpp::Node::SharedPtr node_;
+  LatestMessage<vision_msgs::msg::Detection2DArray> ids_;
+};
+
+/// Whether a gesture asked for is one of those made: "" any, "hand_raised" and "pointing" either
+/// side, or the exact name. Returns the gesture made, or "".
+std::string gesture_matching(const std::string & query, const std::vector<std::string> & made);
+
+/**
+ * Whether someone in the latest message of the body detector (/people/body, the skill "body")
+ * makes a gesture (gesture: hand_raised, hand_raised_left, hand_raised_right, both_hands_raised,
+ * waving, pointing, pointing_left, pointing_right; empty: any). Outputs who (person_id, the TF
+ * frame) and the gesture made; always outputs how many people are in view.
+ */
+class GestureSeen : public BT::ConditionNode
+{
+public:
+  GestureSeen(const std::string & name, const BT::NodeConfig & config);
+  static BT::PortsList providedPorts();
+  BT::NodeStatus tick() override;
+
+private:
+  rclcpp::Node::SharedPtr node_;
+  LatestMessage<perception_system_interfaces::msg::PersonArray> people_;
+};
+
+/**
+ * Whether someone in the latest message of the body detector (/people/body) is fallen on the
+ * floor. Outputs who (person_id, the TF frame); always outputs how many people are in view.
+ */
+class PersonFallen : public BT::ConditionNode
+{
+public:
+  PersonFallen(const std::string & name, const BT::NodeConfig & config);
+  static BT::PortsList providedPorts();
+  BT::NodeStatus tick() override;
+
+private:
+  rclcpp::Node::SharedPtr node_;
+  LatestMessage<perception_system_interfaces::msg::PersonArray> people_;
+};
+
+/// The TF buffer of a node (one per node, with its listener), shared by the nodes of its trees.
+std::shared_ptr<tf2_ros::Buffer> tf_buffer_for(const rclcpp::Node::SharedPtr & node);
+
+/**
+ * Whether a TF frame (a person, an object) is in front of the robot: its bearing from the x axis
+ * of reference_frame (base_link), within max_angle_deg. Outputs the bearing (rad, positive to
+ * the left), the side to turn to (direction: 1 left, -1 right, 0 in front) and the distance.
+ * FAILURE if it is not in front, or the frame does not exist (direction 0). As IsInFront of
+ * bt_nodes, for a behavior that turns the robot until it faces someone.
+ */
+class FrameInFront : public BT::ConditionNode
+{
+public:
+  FrameInFront(const std::string & name, const BT::NodeConfig & config);
+  static BT::PortsList providedPorts();
+  BT::NodeStatus tick() override;
+
+private:
+  rclcpp::Node::SharedPtr node_;
+  std::shared_ptr<tf2_ros::Buffer> buffer_;
+};
+
+/**
+ * How far a TF frame (a followed person) moves on the floor (x, y of fixed_frame), with the times
+ * of its transforms (those of the images). It waits until the frame moves start_distance from
+ * where it first was (state WAITING_START), then measures from that point and that time (state
+ * WALKING) until it is distance away, or duration_ms have passed. Outputs the distance (m, the
+ * straight line from the start), the elapsed time (s), the speed (m/s) and the start and end
+ * times (s). SUCCESS when the distance or the duration is reached; FAILURE if the frame is not
+ * updated for lost_timeout_ms. Runs until halted when distance and duration are 0.
+ */
+class MeasureDisplacement : public BT::StatefulActionNode
+{
+public:
+  MeasureDisplacement(const std::string & name, const BT::NodeConfig & config);
+  static BT::PortsList providedPorts();
+  BT::NodeStatus onStart() override;
+  BT::NodeStatus onRunning() override;
+  void onHalted() override {}
+
+private:
+  rclcpp::Node::SharedPtr node_;
+  std::shared_ptr<tf2_ros::Buffer> buffer_;
+  bool has_origin_ {false}, walking_ {false};
+  double origin_x_ {0.0}, origin_y_ {0.0}, start_x_ {0.0}, start_y_ {0.0};
+  rclcpp::Time start_stamp_, last_stamp_;
+  rclcpp::Time last_update_;          // the wall time of the last new transform
 };
 
 }  // namespace perception_system_behaviors

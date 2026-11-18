@@ -1,0 +1,18 @@
+# Wait until a person makes a gesture (e.g. waves at the robot, raises a hand, points). Served by
+# /perception_orchestrator (the behavior wait_for_gesture), with the skill "body".
+
+# hand_raised (either hand), hand_raised_left, hand_raised_right, both_hands_raised, waving,
+# pointing (either arm), pointing_left, pointing_right. Empty: any of them
+string gesture
+# How long to wait. 0: no limit (until cancelled)
+float32 timeout_s
+---
+bool found
+# found, timeout, cancelled
+string reason
+# The gesture made and who made it (with their TF frame, the place they point at...)
+string gesture
+Person person
+---
+# How many people are in view
+int32 people

@@ -12,8 +12,8 @@ and offer a standard interface; the behaviors that need them activate and use th
 |---|---|---|
 | Deliberation, planning | Not needed: the goal comes in the request | — |
 | Coordination | One FSM per perception task in progress: `STARTING` (the behavior's tree is built), `RUNNING` (feedback), `ENDING` (result, requests closed) | `/perception_orchestrator`, a `BaseOrchestrator` (`perception_orchestrator`) |
-| Action | The perception behaviors, one Behavior Tree each: `TrackObject`, `WaitForObject`, `ObserveClass`; a pool of `BehaviorRunner`s per behavior | `perception_system_behaviors/behavior_tree_xml` |
-| Capabilities | The sensing node, which serves the requests (models, trackers, 3D placement, frames), and the skill nodes about the user | `/perception_system`, `perception_user` |
+| Action | The perception behaviors, one Behavior Tree each: `TrackObject`, `FollowPerson`, `MeasureWalk`, `WaitForObject`, `ObserveClass`, `WaitForGesture`, `WatchForFall`; a pool of `BehaviorRunner`s per behavior | `perception_system_behaviors/behavior_tree_xml` |
+| Capabilities | The sensing node, which serves the requests (models, trackers, 3D placement, frames), and the skill nodes: the user (lips, expression), the body (posture, falls, gestures, pointing) and the markers | `/perception_system`, `perception_user`, `perception_body`, `perception_markers` |
 | Interpretation | None: no question of the system needs a language model | — |
 
 For the rest of the robot, the perception system has the interface of any capability:
@@ -51,8 +51,10 @@ For the rest of the robot, the perception system has the interface of any capabi
 |---|---|---|
 | `/perception_system` | `perception_system` | The sensing node, a lifecycle node: the requests, the models (local or remote engine), one tracker per request, the 3D placement, the TF frames, the skills, the status |
 | `/perception_orchestrator` | `perception_orchestrator` | The FSM of the tasks; its runners `perception_<behavior>_<n>`. Runs in `mission_executor` with the node `/perception_bt_node` of the trees |
-| `/lip_activity_detector` | `perception_user` | The skill `speaking`, a lifecycle node activated by `/perception_system` |
-| `/emotion_detector` | `perception_user` | The skill `emotion` (experimental), a lifecycle node activated by `/perception_system` |
+| `/lip_activity_detector` | `perception_user` | The skill `lip_activity`, a lifecycle node activated by `/perception_system` |
+| `/emotion_detector` | `perception_user` | The skill `facial_expression` (experimental), a lifecycle node activated by `/perception_system` |
+| `/body_detector` | `perception_body` | The skill `body`: the people with the keypoints of their body (YOLO pose), posture, fall, gestures, pointing, facing, clothes, and their TF frames ([BODY_PERCEPTION.md](BODY_PERCEPTION.md)) |
+| `/marker_detector` | `perception_markers` | The skill `markers`: ArUco and AprilTag markers with their 6D pose and TF frames |
 | `perception_server` | `perception_detectors` | Not a ROS node: an HTTP server that runs the models on another computer |
 
 ## A detection request
@@ -98,6 +100,15 @@ once per request.
 | `MODE_SINGLE` | `frame_id` at the detection of a class and tracker id | Every image in which that detection is |
 | `MODE_GROUP` | `frame_id` at the midpoint of N detections of a class (the first N seen; one missing for 5 images is replaced by another of the class; N ≤ 0: all) | Every image in which the whole group is; also the half width of the group across the line of sight, plus half a body |
 | `MODE_EACH` | `<frame_id>_<id>` for every tracked detection of a class (or of every class) | Every image, for the detections in it |
+| `MODE_FOLLOW` | `frame_id` at one detection, as `MODE_SINGLE`, followed through the changes of its tracker id | Every image in which it is |
+
+In `MODE_FOLLOW` the object is followed by its appearance as well as by its id. While it is seen,
+samples of its appearance are kept (an embedding of OSNet, the re-identification network of
+StrongSORT, or a color histogram: `follow.appearance`), and every other detection of the class
+seen at the same time is marked as another object. When its id is not in an image (the tracker
+lost it: it left the view, someone crossed in front), the detections of the class never seen with
+it are compared with the samples, and the most similar one, above `follow.min_similarity`, takes
+its place. Another person of the same clothes who was in view with it is never taken for it.
 
 The point of the camera frame is placed in the fixed frame with the camera pose looked up at the
 time of the image (waiting up to `tf_lookup_timeout_ms` for it): while the robot turns, the latest
@@ -149,5 +160,6 @@ runners of the perception system, and the orchestrator reads its own runners' st
 
 It decides nothing about the robot's motion: a target frame says where something is, and the
 attention system or a behavior decides whether to look at it or go there. It recognises no
-people by identity (a tracker id lasts while the track does) and answers no question in natural
-language; those belong to other capabilities.
+people by identity (a tracker id lasts while the track does; `MODE_FOLLOW` recognizes the person
+it follows by their appearance, during that task only, and keeps no record of them) and answers no
+question in natural language; those belong to other capabilities.

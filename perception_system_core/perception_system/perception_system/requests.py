@@ -34,6 +34,7 @@ OUTPUT_DEFAULT = OUTPUT_DETECTIONS_2D | OUTPUT_DETECTIONS_3D | OUTPUT_DETECTIONS
 MODE_SINGLE = 0
 MODE_GROUP = 1
 MODE_EACH = 2
+MODE_FOLLOW = 3
 
 
 class RequestError(ValueError):
@@ -136,6 +137,9 @@ class FrameRequest:
     def describe(self):
         if self.mode == MODE_SINGLE:
             what = f'{self.class_name} {self.detection_id}'
+        elif self.mode == MODE_FOLLOW:
+            current = self.target.detection_id if self.target is not None else self.detection_id
+            what = f'{self.class_name} {current}, followed by its appearance'
         elif self.mode == MODE_EACH:
             return f'{self.frame_id}_<id> in {self.fixed_frame_id}: each ' \
                 f'{self.class_name or "detection"} of {self.source}'

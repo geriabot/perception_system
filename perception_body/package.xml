@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>perception_body</name>
+  <version>0.1.0</version>
+  <description>The skill "body" of the perception system, a lifecycle node that the perception system activates on demand: the people in view with the keypoints of their body (YOLO pose), their posture (standing, sitting, lying), a fall, their gestures (a raised hand, both hands raised, waving, pointing), the place they point at on the floor, whether they face the camera and the color of their clothes, as messages, events and TF frames</description>
+  <maintainer email="rodrigo.perez@urjc.es">Rodrigo Pérez-Rodríguez</maintainer>
+  <license>Apache-2.0</license>
+  <author email="rodrigo.perez@urjc.es">Rodrigo Pérez-Rodríguez</author>
+
+  <depend>rclpy</depend>
+  <depend>sensor_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>cv_bridge</depend>
+  <depend>tf2_ros</depend>
+  <depend>perception_system_interfaces</depend>
+  <exec_depend>perception_detectors</exec_depend>
+  <exec_depend>detection_3d_estimators</exec_depend>
+  <exec_depend>python3-numpy</exec_depend>
+  <exec_depend>python3-opencv</exec_depend>
+  <!-- ultralytics (AGPL-3.0, optional, as for the yolo detector), torch and boxmot come from pip
+       or pixi (requirements.txt) -->
+
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

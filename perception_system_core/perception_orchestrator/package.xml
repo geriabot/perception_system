@@ -3,7 +3,7 @@
 <package format="3">
   <name>perception_orchestrator</name>
   <version>0.1.0</version>
-  <description>The coordination layer of the perception system: a koch2 orchestrator (perception_orchestrator) that serves the perception tasks (TrackObject, WaitForObject, ObserveClass) as actions, each run by a perception behavior in its own BehaviorRunner, and activates /perception_system in cascade</description>
+  <description>The coordination layer of the perception system: a koch2 orchestrator (perception_orchestrator) that serves the perception tasks (TrackObject, FollowPerson, MeasureWalk, WaitForObject, ObserveClass, WaitForGesture, WatchForFall) as actions, each run by a perception behavior in its own BehaviorRunner, and activates /perception_system in cascade</description>
   <maintainer email="rodrigo.perez@urjc.es">Rodrigo Pérez-Rodríguez</maintainer>
   <license>Apache-2.0</license>
   <author email="rodrigo.perez@urjc.es">Rodrigo Pérez-Rodríguez</author>

@@ -3,7 +3,7 @@
 <package format="3">
   <name>perception_system_interfaces</name>
   <version>0.1.0</version>
-  <description>The messages and services of the perception system: detection, target frame and skill requests, the tasks of the orchestrator (track an object, wait for an object, observe a class), the objects seen, its status and the state of the user</description>
+  <description>The messages and services of the perception system: detection, target frame and skill requests, the tasks of the orchestrator (track an object, follow a person, wait for an object, observe a class, wait for a gesture, watch for a fall), the objects and people seen, its status and the state of the user</description>
   <maintainer email="rodrigo.perez@urjc.es">Rodrigo Pérez-Rodríguez</maintainer>
   <license>Apache-2.0</license>
 
@@ -12,6 +12,7 @@
 
   <depend>builtin_interfaces</depend>
   <depend>geometry_msgs</depend>
+  <depend>std_msgs</depend>
   <depend>vision_msgs</depend>
   <depend>action_msgs</depend>
 

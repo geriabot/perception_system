@@ -15,7 +15,10 @@
 """The checks of the perception tasks (the actions of /perception_orchestrator) and of the
 services about objects and models, against the ground truth of synthetic_camera.py: TrackObject,
 WaitForObject (found and timeout), ObserveClass (a frame per object), several tasks at once, a
-full pool of slots, cancelling, GetObjects, ListModels and the frames of MODE_EACH. Run it with
+full pool of slots, cancelling, GetObjects, ListModels, the frames of MODE_EACH, and
+FollowPerson (the walker leaves the scene for longer than the tracker keeps its id, and is
+recognized again by its appearance; the other red box is never taken for it), a task with
+another tracker, and MeasureWalk (the walk of the walker against its ground truth). Run it with
 the system started as in evaluation/README.md; one line per check, exit code 1 if any fails.
 
     python3 check_tasks.py [--report report.json]
@@ -38,7 +41,8 @@ from std_msgs.msg import String
 import tf2_ros
 
 from perception_system.client import MODE_EACH, PerceptionClient
-from perception_system_interfaces.action import ObserveClass, TrackObject, WaitForObject
+from perception_system_interfaces.action import FollowPerson, MeasureWalk, ObserveClass, \
+    TrackObject, WaitForObject
 from perception_system_interfaces.srv import GetObjects, ListModels
 
 TOLERANCE_M = 0.06
@@ -59,7 +63,13 @@ class TaskChecker(Node):
                                  callback_group=self.group),
             'observe': ActionClient(self, ObserveClass, f'{SYSTEM}/observe_class',
                                     callback_group=self.group),
+            'follow': ActionClient(self, FollowPerson, f'{SYSTEM}/follow_person',
+                                   callback_group=self.group),
+            'walk': ActionClient(self, MeasureWalk, f'{SYSTEM}/measure_walk',
+                                 callback_group=self.group),
         }
+        self.history = []       # (stamp in s, the boxes) of every image
+        self.hidden_pub = self.create_publisher(String, '/synthetic/hidden', 10)
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
         self.truth = None
@@ -71,6 +81,19 @@ class TaskChecker(Node):
     def on_truth(self, msg):
         with self.lock:
             self.truth = json.loads(msg.data)
+            sec, nanosec = self.truth['stamp']
+            self.history.append((sec + nanosec * 1e-9, {b['name']: b
+                                                         for b in self.truth['boxes']}))
+
+    def truth_at(self, name, t):
+        """The place (x, y) of a box at the time t (s), interpolated between images."""
+        with self.lock:
+            points = [(s, b[name]['x'], b[name]['y']) for s, b in self.history if name in b]
+        for (s0, x0, y0), (s1, x1, y1) in zip(points, points[1:]):
+            if s0 <= t <= s1:
+                a = (t - s0) / (s1 - s0) if s1 > s0 else 0.0
+                return x0 + a * (x1 - x0), y0 + a * (y1 - y0)
+        return None
 
     def box(self, name):
         with self.lock:
@@ -226,6 +249,87 @@ class TaskChecker(Node):
         frames = [self.frame(f'red_box_{o.id}') for o in reply.objects]
         self.check('MODE_EACH: a frame per object, <frame_id>_<id>', all(frames))
         self.client.stop('objects')
+        self.check_follow()
+        self.check_tracker_and_walk()
+
+    def check_tracker_and_walk(self):
+        # A task with another tracker, chosen by the client: OC-SORT
+        observe = self.send('observe', ObserveClass.Goal(class_name='red', tracker='ocsort'))
+        time.sleep(4.0)
+        requests = {r.name: r.description for r in self.client.status().requests}
+        described = [d for n, d in requests.items() if n.startswith('perception_observe_class')
+                     and 'tracker ocsort' in d]
+        self.check('a task with the tracker chosen by the client (ocsort)',
+                   observe is not None and observe.accepted and len(described) == 1,
+                   described[0] if described else str(requests))
+        self.wait(observe.cancel_goal_async())
+        self.wait(observe.get_result_async(), 10.0)
+        refused = self.send('observe', ObserveClass.Goal(class_name='red', tracker='nonsense'))
+        self.check('a task with an unknown tracker is refused',
+                   refused is not None and not refused.accepted)
+
+        # MeasureWalk: the walker walks 0.4 m; its distance and speed against the ground truth
+        # between the times of the images of the start and the end
+        feedbacks = []
+        handle = self.send('walk', MeasureWalk.Goal(
+            class_name='red', distance_m=0.4, start_distance_m=0.05, find_timeout_s=10.0,
+            lost_timeout_s=5.0, tracker='bytetrack'), lambda f: feedbacks.append(f.feedback))
+        result = self.wait(handle.get_result_async(), 60.0) if handle else None
+        states = sorted({f.state for f in feedbacks})
+        r = result.result if result else None
+        start = r.start_stamp.sec + r.start_stamp.nanosec * 1e-9 if r else 0.0
+        end = r.end_stamp.sec + r.end_stamp.nanosec * 1e-9 if r else 0.0
+        a, b = self.truth_at('walker', start), self.truth_at('walker', end)
+        truth = math.dist(a, b) if a and b else None
+        truth_speed = truth / (end - start) if truth and end > start else None
+        self.check('MeasureWalk: completed, the walk against the ground truth',
+                   r is not None and r.reason == 'completed' and r.distance_m >= 0.4 and
+                   truth is not None and abs(r.distance_m - truth) < 0.05 and
+                   abs(r.speed_mps - truth_speed) < 0.1 * truth_speed,
+                   f'{r.distance_m:.3f} m in {r.time_s:.2f} s, {r.speed_mps:.3f} m/s; truth '
+                   f'{truth:.3f} m, {truth_speed:.3f} m/s; states {states}'
+                   if r is not None and truth else str(r.reason if r else 'no result'))
+
+    def check_follow(self):
+        # FollowPerson: the nearest red box, the walker. It leaves the scene for longer than the
+        # tracker keeps its id (max_age, 45 images: 9 s at 5 images/s); the other red box, of the
+        # same appearance, is seen with it and is never taken for it
+        feedbacks = []
+        handle = self.send('follow', FollowPerson.Goal(class_name='red', find_timeout_s=10.0,
+                                                       lost_timeout_s=40.0),
+                           lambda f: feedbacks.append(f.feedback))
+        self.check('FollowPerson accepted', handle is not None and handle.accepted)
+        time.sleep(5.0)
+        first = feedbacks[-1] if feedbacks else None
+        position = self.frame('followed_person')
+        error = math.dist(position[0], self.ground('walker')) if position else None
+        self.check('FollowPerson: FOLLOWING the walker, the frame followed_person on it',
+                   first is not None and first.state == 'FOLLOWING' and error is not None and
+                   error < 0.15, f'{first.state if first else None}, error {error:.3f} m'
+                   if error is not None else 'no frame')
+        self.hidden_pub.publish(String(data='["walker"]'))
+        time.sleep(12.0)
+        during = feedbacks[-1] if feedbacks else None
+        self.check('FollowPerson: LOST while the walker is away, the other red box not taken',
+                   during is not None and during.state == 'LOST' and first is not None and
+                   during.id == first.id, f'{during.state} {during.id}' if during else '')
+        self.hidden_pub.publish(String(data='[]'))
+        time.sleep(6.0)
+        last = feedbacks[-1] if feedbacks else None
+        position = self.frame('followed_person', timeout=1.0)
+        error = math.dist(position[0], self.ground('walker')) if position else None
+        self.check('FollowPerson: the walker recognized again with a new id',
+                   last is not None and first is not None and last.state == 'FOLLOWING' and
+                   last.id != first.id and last.reidentifications >= 1 and error is not None
+                   and error < 0.15,
+                   f'{first.id} -> {last.id}, {last.reidentifications} reidentifications, '
+                   f'error {error:.3f} m' if last and error is not None else
+                   f'{last.state if last else None}')
+        self.wait(handle.cancel_goal_async())
+        result = self.wait(handle.get_result_async(), 10.0)
+        self.check('FollowPerson: cancelled', result is not None and
+                   result.result.reason == 'cancelled',
+                   result.result.reason if result else 'no result')
 
 
 def main():

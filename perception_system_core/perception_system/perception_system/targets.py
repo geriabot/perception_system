@@ -21,9 +21,11 @@ detections of a class: it keeps the ids of the first N seen, and replaces an id 
 MAX_MISSING_ITERATIONS messages by another detection of the class. Both reproduce the TF
 publishers of the attention system (pub_single_detection_tf_node and
 pub_n_detections_same_class_tf_node), message by message. EachTarget gives a point per tracked
-detection of a class.
+detection of a class. FollowTarget is a SingleTarget that recognizes its object again, by its
+appearance, when the tracker gives it a new id.
 """
 
+from collections import deque
 from dataclasses import dataclass
 import math
 
@@ -224,3 +226,89 @@ class EachTarget:
     def take(self):
         points, self.pending = self.pending, None
         return points
+
+
+class FollowTarget:
+    """One detection, by class and tracker id, followed through the changes of its id.
+
+    While the object is seen, samples of its appearance are kept (one every sample_every images,
+    the latest gallery_size), and every other id of the class seen at the same time is marked as
+    another object. When its id is not in an image, the detections of the class with an id never
+    seen with it are candidates; the one most similar to the samples (cosine, at least
+    min_similarity) takes its place. observe() is called with the 2D detections and the image
+    before update() with the 3D detections of the same image."""
+
+    def __init__(self, class_name, detection_id, appearance, min_similarity, gallery_size=20,
+                 sample_every=5):
+        self.single = SingleTarget(class_name, detection_id)
+        self.appearance = appearance
+        self.min_similarity = min_similarity
+        self.gallery = deque(maxlen=gallery_size)
+        self.sample_every = sample_every
+        self.others = set()           # ids seen at the same time as the object
+        self.images = 0
+        self.reidentifications = 0
+        self.last_similarity = None   # of the last candidate considered
+
+    @property
+    def detection_id(self):
+        return self.single.detection_id
+
+    @property
+    def class_name(self):
+        return self.single.class_name
+
+    @property
+    def seen(self):
+        return self.single.seen
+
+    @property
+    def tracked_ids(self):
+        return [self.detection_id] if self.single.seen else []
+
+    def similarity(self, embedding):
+        if not self.gallery:
+            return 0.0
+        return max(float((embedding * sample).sum()) for sample in self.gallery)
+
+    def observe(self, image, detections, log=None):
+        """detections: the 2D detections of the image (perception_detectors Detection: cx, cy,
+        w, h, label, id). Returns the new id if the object was recognized again now."""
+        by_id = {d.id: d for d in detections if d.id and d.label == self.class_name}
+        target = by_id.get(self.detection_id)
+        if target is not None:
+            self.others |= set(by_id) - {self.detection_id}
+            if self.images % self.sample_every == 0:
+                self.gallery.append(self.appearance.embed(image, box_of(target)))
+            self.images += 1
+            return None
+        candidates = [d for i, d in by_id.items() if i not in self.others]
+        if not candidates or not self.gallery:
+            return None
+        scored = [(self.similarity(self.appearance.embed(image, box_of(d))), d)
+                  for d in candidates]
+        similarity, best = max(scored, key=lambda item: item[0])
+        self.last_similarity = similarity
+        if similarity < self.min_similarity:
+            return None
+        if log is not None:
+            log(f'{self.class_name} {self.detection_id} recognized again as {best.id} '
+                f'(similarity {similarity:.2f})')
+        # The other candidates of this image are other objects
+        self.others |= {d.id for d in candidates if d is not best}
+        self.others.add(self.detection_id)
+        self.single.detection_id = best.id
+        self.reidentifications += 1
+        return best.id
+
+    def update(self, detections_msg, log=None):
+        return self.single.update(detections_msg, log)
+
+    def take(self):
+        return self.single.take()
+
+
+def box_of(detection):
+    """x0, y0, x1, y1 of a 2D detection (center and size)."""
+    return (detection.cx - detection.w / 2, detection.cy - detection.h / 2,
+            detection.cx + detection.w / 2, detection.cy + detection.h / 2)

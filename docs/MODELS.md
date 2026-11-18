@@ -34,10 +34,19 @@ searched and each detection keeps its own.
 |---|---|---|
 | `strongsort` (default) | StrongSORT with appearance re-identification (OSNet): ids through occlusions and crossings, and for objects carried by a person | Whenever there is a GPU |
 | `bytetrack` | ByteTrack, motion only: far cheaper | A CPU, many requests |
+| `botsort` | BoT-SORT with camera motion compensation, configured as the tracker of YOLO (Ultralytics' `botsort.yaml`: no re-identification) | A moving camera; the same ids as YOLO's own tracking |
+| `ocsort` | OC-SORT, motion only, robust to non-linear motion and short occlusions | A CPU, objects that turn or stop |
+| `deepocsort` | Deep OC-SORT: OC-SORT with appearance re-identification (OSNet) | Crowds, with a GPU |
 | `none` | No ids | `detect_once`, counting |
 
-A StrongSORT id is given once a track has `min_hits` detections; until then the detection has an
-empty id and is not drawn in `detections_image`. ByteTrack gives ids at once. Each request
+Each request (and each task) chooses its tracker (`tracker`), as it chooses its model; the
+parameters of `tracking.*` apply to all of them ([CONFIGURATION.md](CONFIGURATION.md)).
+Recognizing an object again after a long absence is not the tracker's job: a target frame in
+`MODE_FOLLOW` (the task `FollowPerson`) does it by appearance.
+
+A StrongSORT (and OC-SORT, Deep OC-SORT) id is given once a track has `min_hits` detections;
+until then the detection has an empty id and is not drawn in `detections_image`. ByteTrack and
+BoT-SORT give ids at once. Each request
 numbers its tracks from 1.
 
 ## Adding a model

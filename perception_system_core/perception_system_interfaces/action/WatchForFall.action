@@ -1,0 +1,14 @@
+# Watch the people in view and end when one of them is fallen on the floor (e.g. to raise an
+# alarm). Served by /perception_orchestrator (the behavior watch_for_fall), with the skill "body".
+
+# How long to watch. 0: no limit (until cancelled)
+float32 timeout_s
+---
+bool fallen
+# fallen, timeout, cancelled
+string reason
+# The fallen person (position, TF frame)
+Person person
+---
+# How many people are in view
+int32 people

@@ -3,7 +3,7 @@
 <package format="3">
   <name>perception_system_behaviors</name>
   <version>0.1.0</version>
-  <description>Behavior Tree nodes (BehaviorTree.CPP 4) for the behaviors of the robot to use the perception system: StartDetection, StartTargetFrame, StartPerceptionSkill, StopPerception, DetectOnce and DetectionSeen, in the plugin perception_system_bt_nodes</description>
+  <description>Behavior Tree nodes (BehaviorTree.CPP 4) for the behaviors of the robot to use the perception system: StartDetection, StartTargetFrame, StartPerceptionSkill, StopPerception, DetectOnce, DetectionSeen, SelectDetection, FrameTargetSeen, GestureSeen, PersonFallen, FrameInFront and MeasureDisplacement, in the plugin perception_system_bt_nodes, and the perception behaviors (TrackObject, FollowPerson, MeasureWalk, WaitForObject, ObserveClass, WaitForGesture, WatchForFall)</description>
   <maintainer email="rodrigo.perez@urjc.es">Rodrigo Pérez-Rodríguez</maintainer>
   <license>Apache-2.0</license>
   <author email="rodrigo.perez@urjc.es">Rodrigo Pérez-Rodríguez</author>
@@ -13,6 +13,9 @@
   <depend>rclcpp</depend>
   <depend>behaviortree_cpp</depend>
   <depend>vision_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>tf2</depend>
+  <depend>tf2_ros</depend>
   <depend>perception_system_interfaces</depend>
 
   <test_depend>ament_cmake_gtest</test_depend>

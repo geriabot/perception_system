@@ -7,7 +7,8 @@
     Needs:            the perception system (/perception_system) active
     Ports:            request (string, required): the name of its detection request;
                       class (string, required); category (string, default "");
-                      model (string, default "": the default model);
+                      model, model_options, tracker (string, default "": the defaults of
+                      the system);
                       min_count (int, required); timeout_ms (int, required)
     Outputs:          count (int): how many are in view
     Result:           SUCCESS when they are in view; FAILURE after timeout_ms
@@ -19,6 +20,7 @@
   <BehaviorTree ID="WaitForObject">
     <Sequence>
       <StartDetection request="{request}" class="{class}" category="{category}" model="{model}"
+                      model_options="{model_options}" tracker="{tracker}"
                       outputs="3" detections_2d_topic="{topic_2d}"/>
       <Timeout msec="{timeout_ms}">
         <RetryUntilSuccessful num_attempts="-1">

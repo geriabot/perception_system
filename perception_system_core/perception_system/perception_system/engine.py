@@ -29,7 +29,7 @@ from perception_detectors import backends, protocol
 from perception_detectors.pipeline import Detection, DetectionPipeline
 from perception_detectors.tracking import resolve_device, StrongSortTracker, TRACKER_DEFAULTS
 
-TRACKERS = ('strongsort', 'bytetrack', 'none')
+TRACKERS = ('strongsort', 'bytetrack', 'botsort', 'ocsort', 'deepocsort', 'none')
 
 
 def options_key(model, options):
@@ -42,7 +42,7 @@ class RequestConfig:
     def __init__(self, model, options, tracker, class_name='', category='', labels=()):
         self.model = model
         self.options = dict(options or {})
-        self.tracker = tracker                  # strongsort, bytetrack or none
+        self.tracker = tracker                  # one of TRACKERS
         self.class_name = class_name.strip()
         self.category = category.strip()
         self.labels = [label for label in labels if label]

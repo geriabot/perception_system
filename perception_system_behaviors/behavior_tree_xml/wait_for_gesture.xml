@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<root BTCPP_format="4">
+  <!--
+    WaitForGesture: wait until someone makes a gesture (waves at the robot, raises a hand,
+    points), with the skill "body" of the perception system.
+
+    Plugin libraries: libperception_system_bt_nodes.so (package perception_system_behaviors)
+    Needs:            the perception system (/perception_system) active, and its body detector
+    Ports:            request (string, required): the name of its skill request;
+                      gesture (string, default "": any): hand_raised, hand_raised_left,
+                      hand_raised_right, both_hands_raised, waving, pointing, pointing_left,
+                      pointing_right;
+                      timeout_ms (int, required)
+    Outputs:          person_id, person_frame (string): who made it and their TF frame;
+                      made (string): the gesture made; people (int): how many are in view
+    Result:           SUCCESS when the gesture is made; FAILURE after timeout_ms
+    Usage:            <SubTree ID="WaitForGesture" request="call" gesture="waving"
+                               timeout_ms="60000" person_id="{who}" person_frame="{frame}"/>
+    The skill request stays open when the tree ends or is halted: end it with StopPerception
+    (request).
+  -->
+  <BehaviorTree ID="WaitForGesture">
+    <Sequence>
+      <StartPerceptionSkill request="{request}" skill="body"/>
+      <Timeout msec="{timeout_ms}">
+        <RetryUntilSuccessful num_attempts="-1">
+          <Sequence>
+            <Sleep msec="100"/>
+            <GestureSeen gesture="{gesture}" person_id="{person_id}"
+                         person_frame="{person_frame}" made="{made}" people="{people}"/>
+          </Sequence>
+        </RetryUntilSuccessful>
+      </Timeout>
+    </Sequence>
+  </BehaviorTree>
+</root>

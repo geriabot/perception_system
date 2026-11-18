@@ -47,7 +47,9 @@ description = "Unit tests of the packages that need no running ROS graph"
 cmd = """bash -c 'source install/setup.bash && python -m pytest -q \
   src/perception_system/perception_detectors/test \
   src/perception_system/perception_system_core/perception_system/test \
-  src/perception_system/perception_user/test'"""
+  src/perception_system/perception_user/test \
+  src/perception_system/perception_body/test \
+  src/perception_system/perception_markers/test'"""
 
 # ---------------------------------------------------------------------------
 # ROS 2 distributions. Jazzy is the default; Lyrical builds into its own folders
@@ -69,8 +71,8 @@ ros-jazzy-rviz2 = "*"
 opencv = "<5"  # boxmot requires opencv-python<5
 
 # The detection models and the tracker: the versions of the attention system, whose results
-# were obtained with them; Ultralytics for YOLO and YOLO-World (AGPL-3.0); MediaPipe for the
-# perception of the user (perception_user)
+# were obtained with them; Ultralytics for YOLO, YOLO-World and the pose model of the body
+# (AGPL-3.0); MediaPipe for the perception of the user (perception_user)
 [feature.jazzy.pypi-dependencies]
 torch = "==2.7.0"
 torchvision = "==0.22.0"

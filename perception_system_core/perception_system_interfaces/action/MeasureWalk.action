@@ -1,0 +1,46 @@
+# Measure how fast a person walks (e.g. a gait speed test): find them, follow them (recognized
+# again by their appearance if the tracker loses them), wait until they start walking (they move
+# start_distance_m), and measure the time they take to walk distance_m from there (or how far
+# they walk in duration_s). The distance is the straight line on the floor from where they
+# started, and the times are those of the images. Served by /perception_orchestrator (the
+# behavior measure_walk).
+
+# The class of the person (empty: person) and its base category, also searched
+string class_name
+string category
+# Who, at the start: nearest (to the camera) or first (the first one confirmed)
+string selection
+# The TF frame published on them. Empty: walking_person
+string frame_id
+# The distance to walk, m (0 and duration_s 0: 4 m, the usual gait speed test)
+float32 distance_m
+# Or the time to walk, s (0: until distance_m)
+float32 duration_s
+# How far they must move to have started, m (0: 0.2)
+float32 start_distance_m
+# How long to search for them at the start (0: no limit), and how long they may be out of view
+# (0: 3 s)
+float32 find_timeout_s
+float32 lost_timeout_s
+# The detection model and tracker (empty: the defaults), as in TrackObject
+string model
+string model_options
+string tracker
+---
+# completed, not found, lost, cancelled
+string reason
+# What was measured (until the person was lost, if they were)
+float32 distance_m
+float32 time_s
+float32 speed_mps
+# The times of the images when they started and when the measurement ended
+builtin_interfaces/Time start_stamp
+builtin_interfaces/Time end_stamp
+string id
+---
+# SEARCHING, WAITING_START (found, not walking yet), WALKING, LOST
+string state
+string id
+float32 distance_m
+float32 elapsed_s
+float32 speed_mps

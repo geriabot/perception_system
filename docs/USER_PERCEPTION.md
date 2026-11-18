@@ -6,8 +6,8 @@ activation (`autostart_skills`). While inactive they process no image.
 
 | Skill | Node | Output | State |
 |---|---|---|---|
-| `speaking` | `/lip_activity_detector` | `/user_speaking` (`std_msgs/Bool`), `/lip_activity` (`std_msgs/Float32`) | Used for visual barge-in by the interaction system |
-| `emotion` | `/emotion_detector` | `/user_emotion` (`std_msgs/String`, JSON) | Experimental, not validated |
+| `lip_activity` | `/lip_activity_detector` | `/user_speaking` (`std_msgs/Bool`), `/lip_activity` (`std_msgs/Float32`) | Used for visual barge-in by the interaction system |
+| `facial_expression` | `/emotion_detector` | `/user_emotion` (`std_msgs/String`, JSON) | Experimental, not validated |
 
 `/perception_system/get_user_state` (`GetUserState`) returns the latest of both: `speaking`, and
 the emotion with its confidence and source (`available` is false until an emotion has arrived).

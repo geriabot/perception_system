@@ -10,7 +10,8 @@
                       frame_request (string, required): the name of its target frame request;
                       class (string, default ""); category (string, default "");
                       labels (string, default ""): several classes, "cup; bowl", instead of class;
-                      model (string, default "": the default model);
+                      model, model_options, tracker (string, default "": the defaults of
+                      the system);
                       frame_prefix (string, required)
     Result:           runs until halted; FAILURE if a request is refused
     Usage:            <SubTree ID="ObserveClass" request="people" frame_request="people_frames"
@@ -21,7 +22,8 @@
   <BehaviorTree ID="ObserveClass">
     <Sequence>
       <StartDetection request="{request}" class="{class}" category="{category}"
-                      labels="{labels}" model="{model}" outputs="3"/>
+                      labels="{labels}" model="{model}"
+                      model_options="{model_options}" tracker="{tracker}" outputs="3"/>
       <StartTargetFrame request="{frame_request}" detection_request="{request}"
                         frame_id="{frame_prefix}" class="{class}" mode="each"/>
       <KeepRunningUntilFailure>

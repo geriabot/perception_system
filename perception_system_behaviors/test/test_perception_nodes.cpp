@@ -26,9 +26,12 @@
 
 #include "behaviortree_cpp/bt_factory.h"
 #include "rclcpp/rclcpp.hpp"
+#include "tf2_ros/transform_broadcaster.h"
 #include "vision_msgs/msg/detection2_d_array.hpp"
 #include "vision_msgs/msg/detection3_d_array.hpp"
 
+#include "perception_system_behaviors/perception_nodes.hpp"
+#include "perception_system_interfaces/msg/person_array.hpp"
 #include "perception_system_interfaces/srv/detect_once.hpp"
 #include "perception_system_interfaces/srv/start_detection.hpp"
 #include "perception_system_interfaces/srv/start_target_frame.hpp"
@@ -248,6 +251,11 @@ TEST_F(PerceptionNodes, CountsAndSelectsDetections)
     run(retry("<SelectDetection topic=\"/test/select_3d\" class=\"person\" policy=\"first\" "
       "id=\"{id}\"/>"), blackboard, publish), BT::NodeStatus::SUCCESS);
   EXPECT_EQ(blackboard->get<std::string>("id"), "7");
+  // Only nearer than 3 m: the person at 4 m (the first) is not a candidate
+  EXPECT_EQ(
+    run(retry("<SelectDetection topic=\"/test/select_3d\" class=\"person\" policy=\"first\" "
+      "max_distance=\"3.0\" id=\"{id}\"/>"), blackboard, publish), BT::NodeStatus::SUCCESS);
+  EXPECT_EQ(blackboard->get<std::string>("id"), "9");
 }
 
 TEST_F(PerceptionNodes, EachModeNeedsNoClass)
@@ -261,15 +269,160 @@ TEST_F(PerceptionNodes, EachModeNeedsNoClass)
     BT::NodeStatus::FAILURE);   // single without a class
 }
 
+TEST_F(PerceptionNodes, FollowModeAndItsTarget)
+{
+  EXPECT_EQ(
+    run("<StartTargetFrame request=\"f\" detection_request=\"b\" frame_id=\"p\" "
+      "class=\"person\" id=\"3\" mode=\"follow\"/>"), BT::NodeStatus::SUCCESS);
+  EXPECT_EQ(fake_->last_mode, srv::StartTargetFrame::Request::MODE_FOLLOW);
+  auto publisher = server_node_->create_publisher<vision_msgs::msg::Detection2DArray>(
+    "/perception_system/frames/f/tracked_ids", 10);
+  vision_msgs::msg::Detection2DArray msg;
+  auto publish = [&]() {publisher->publish(msg);};
+  const std::string seen = "<RetryUntilSuccessful num_attempts=\"30\"><Sequence>"
+    "<Sleep msec=\"10\"/><FrameTargetSeen frame_request=\"f\" id=\"{id}\"/>"
+    "</Sequence></RetryUntilSuccessful>";
+  // Not seen: an empty message
+  EXPECT_EQ(run(seen, nullptr, publish), BT::NodeStatus::FAILURE);
+  msg.detections.resize(1);
+  msg.detections[0].id = "8";
+  auto blackboard = BT::Blackboard::create();
+  EXPECT_EQ(run(seen, blackboard, publish), BT::NodeStatus::SUCCESS);
+  EXPECT_EQ(blackboard->get<std::string>("id"), "8");
+}
+
+TEST_F(PerceptionNodes, GesturesAndFalls)
+{
+  using perception_system_interfaces::msg::Person;
+  using perception_system_interfaces::msg::PersonArray;
+  EXPECT_EQ(
+    perception_system_behaviors::gesture_matching("hand_raised", {"waving", "hand_raised_right"}),
+    "hand_raised_right");
+  EXPECT_EQ(perception_system_behaviors::gesture_matching("", {"pointing_left"}), "pointing_left");
+  EXPECT_EQ(perception_system_behaviors::gesture_matching("pointing", {"waving"}), "");
+
+  auto publisher = server_node_->create_publisher<PersonArray>("/people/body", 10);
+  PersonArray msg;
+  Person still, waving, fallen;
+  still.id = "1";
+  waving.id = "2";
+  waving.gestures = {"waving"};
+  waving.frame_id = "body_2";
+  fallen.id = "3";
+  fallen.fallen = true;
+  fallen.frame_id = "body_3";
+  msg.people = {still, waving};
+  auto publish = [&]() {publisher->publish(msg);};
+  auto retry = [](const std::string & node) {
+      return "<RetryUntilSuccessful num_attempts=\"30\"><Sequence><Sleep msec=\"10\"/>" + node +
+             "</Sequence></RetryUntilSuccessful>";
+    };
+  auto blackboard = BT::Blackboard::create();
+  EXPECT_EQ(
+    run(retry("<GestureSeen gesture=\"waving\" person_id=\"{who}\" person_frame=\"{frame}\" "
+      "made=\"{made}\" people=\"{n}\"/>"), blackboard, publish), BT::NodeStatus::SUCCESS);
+  EXPECT_EQ(blackboard->get<std::string>("who"), "2");
+  EXPECT_EQ(blackboard->get<std::string>("frame"), "body_2");
+  EXPECT_EQ(blackboard->get<std::string>("made"), "waving");
+  EXPECT_EQ(blackboard->get<int>("n"), 2);
+  EXPECT_EQ(
+    run(retry("<GestureSeen gesture=\"pointing\"/>"), nullptr, publish),
+    BT::NodeStatus::FAILURE);
+  EXPECT_EQ(run(retry("<PersonFallen/>"), nullptr, publish), BT::NodeStatus::FAILURE);
+  msg.people.push_back(fallen);
+  EXPECT_EQ(
+    run(retry("<PersonFallen person_id=\"{who}\" people=\"{n}\"/>"), blackboard, publish),
+    BT::NodeStatus::SUCCESS);
+  EXPECT_EQ(blackboard->get<std::string>("who"), "3");
+  EXPECT_EQ(blackboard->get<int>("n"), 3);
+}
+
+geometry_msgs::msg::TransformStamped transform_at(
+  const rclcpp::Node::SharedPtr & node, const std::string & parent, const std::string & child,
+  double x, double y, const rclcpp::Time & stamp)
+{
+  geometry_msgs::msg::TransformStamped t;
+  t.header.stamp = stamp;
+  (void)node;
+  t.header.frame_id = parent;
+  t.child_frame_id = child;
+  t.transform.translation.x = x;
+  t.transform.translation.y = y;
+  t.transform.rotation.w = 1.0;
+  return t;
+}
+
+TEST_F(PerceptionNodes, FrameInFrontGivesTheSideToTurnTo)
+{
+  tf2_ros::TransformBroadcaster broadcaster(server_node_);
+  double y = 1.0;
+  auto publish = [&]() {
+      broadcaster.sendTransform(
+        transform_at(server_node_, "test_base", "test_person", 2.0, y, server_node_->now()));
+    };
+  auto blackboard = BT::Blackboard::create();
+  const std::string check = "<RetryUntilSuccessful num_attempts=\"30\"><Sequence>"
+    "<Sleep msec=\"10\"/><FrameInFront frame=\"test_person\" reference_frame=\"test_base\" "
+    "direction=\"{direction}\" bearing=\"{bearing}\" distance=\"{distance}\"/>"
+    "</Sequence></RetryUntilSuccessful>";
+  EXPECT_EQ(run(check, blackboard, publish), BT::NodeStatus::FAILURE);
+  EXPECT_EQ(blackboard->get<int>("direction"), 1);      // on the left
+  EXPECT_NEAR(blackboard->get<double>("bearing"), std::atan2(1.0, 2.0), 1e-6);
+  y = -1.0;
+  EXPECT_EQ(run(check, blackboard, publish), BT::NodeStatus::FAILURE);
+  EXPECT_EQ(blackboard->get<int>("direction"), -1);
+  y = 0.05;
+  EXPECT_EQ(run(check, blackboard, publish), BT::NodeStatus::SUCCESS);
+  EXPECT_EQ(blackboard->get<int>("direction"), 0);
+  EXPECT_NEAR(blackboard->get<double>("distance"), std::hypot(2.0, 0.05), 1e-6);
+}
+
+TEST_F(PerceptionNodes, MeasureDisplacementTimesTheWalk)
+{
+  // A person still for a while, then walking at 0.5 m/s along x; the stamps of the frames are
+  // the times of the "images" (here 0.1 s apart, whatever the wall time)
+  tf2_ros::TransformBroadcaster broadcaster(server_node_);
+  int step = 0;
+  const rclcpp::Time t0 = server_node_->now();
+  auto publish = [&]() {
+      const double t = 0.1 * step++;
+      const double x = t < 1.0 ? 1.0 : 1.0 + 0.5 * (t - 1.0);
+      broadcaster.sendTransform(
+        transform_at(server_node_, "test_odom", "walker", x, 0.0,
+        t0 + rclcpp::Duration::from_seconds(t)));
+    };
+  auto blackboard = BT::Blackboard::create();
+  blackboard->set<unsigned>("lost", 2000);
+  EXPECT_EQ(
+    run(
+      "<MeasureDisplacement frame=\"walker\" fixed_frame=\"test_odom\" start_distance=\"0.1\" "
+      "distance=\"1.0\" lost_timeout_ms=\"{lost}\" walked=\"{walked}\" elapsed=\"{elapsed}\" "
+      "speed=\"{speed}\" state=\"{state}\"/>", blackboard, publish), BT::NodeStatus::SUCCESS);
+  EXPECT_EQ(blackboard->get<std::string>("state"), "WALKING");
+  EXPECT_GE(blackboard->get<double>("walked"), 1.0);
+  EXPECT_NEAR(blackboard->get<double>("speed"), 0.5, 0.05);
+  EXPECT_NEAR(blackboard->get<double>("elapsed"), 2.0, 0.25);
+  // Not updated: lost
+  blackboard->set<unsigned>("lost", 200);
+  EXPECT_EQ(
+    run(
+      "<MeasureDisplacement frame=\"nobody\" fixed_frame=\"test_odom\" distance=\"1.0\" "
+      "lost_timeout_ms=\"{lost}\"/>", blackboard), BT::NodeStatus::FAILURE);
+}
+
 TEST_F(PerceptionNodes, PerceptionBehaviorsLoad)
 {
-  // The three perception behaviors build with the plugin, as a runner of the orchestrator does
-  for (const std::string behavior : {"track_object", "wait_for_object", "observe_class"}) {
+  // The perception behaviors build with the plugin, as a runner of the orchestrator does
+  for (const std::string behavior : {"track_object", "wait_for_object", "observe_class",
+      "follow_person", "wait_for_gesture", "watch_for_fall", "measure_walk"})
+  {
     EXPECT_NO_THROW(factory_.registerBehaviorTreeFromFile(
         std::string(BEHAVIORS_DIR) + "/" + behavior + ".xml")) << behavior;
   }
   const auto ids = factory_.registeredBehaviorTrees();
-  for (const std::string id : {"TrackObject", "WaitForObject", "ObserveClass"}) {
+  for (const std::string id : {"TrackObject", "WaitForObject", "ObserveClass", "FollowPerson",
+      "WaitForGesture", "WatchForFall", "MeasureWalk"})
+  {
     EXPECT_NE(std::find(ids.begin(), ids.end(), id), ids.end()) << id;
   }
 }

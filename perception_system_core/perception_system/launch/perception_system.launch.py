@@ -13,9 +13,10 @@
 # limitations under the License.
 
 """The perception system: the orchestrator (/perception_orchestrator, run by mission_executor of
-koch2, with orchestrator:=true), /perception_system and, with user:=true, the
-nodes of the skills about the user (lip_activity_detector, emotion_detector), which
-/perception_system activates when a client asks for them. The orchestrator activates
+koch2, with orchestrator:=true), /perception_system and the nodes of the skills, which
+/perception_system activates when a client asks for them: about the user (lip_activity_detector,
+emotion_detector, with user:=true), the body (body_detector, with body:=true) and the markers
+(marker_detector, with markers:=true). The orchestrator activates
 /perception_system in cascade; without it, /perception_system activates itself (autostart).
 
     ros2 launch perception_system perception_system.launch.py camera:=rgbd use_sim_time:=true
@@ -44,7 +45,8 @@ ARGUMENTS = [
                   'color_blobs'),
     ('model_options', '', 'Options of the default model, as YAML, e.g. "{threshold: 0.35}"'),
     ('device', '', 'local: torch device (empty: cuda if available)'),
-    ('tracker', '', 'Default tracker of the requests: strongsort, bytetrack or none'),
+    ('tracker', '', 'Default tracker of the requests: strongsort, bytetrack, botsort, ocsort, '
+                    'deepocsort or none'),
     ('preload_model', '', 'Load the default model on activation: true or false'),
     ('zoom_small_detections', '', 'detections_image: add the small detections enlarged'),
     ('server_url', '', 'remote: the perception server (default http://localhost:8765)'),
@@ -57,11 +59,16 @@ ARGUMENTS = [
                             'none (overrides the camera)'),
     ('fixed_frame_id', '', 'The parent of the target frames (default odom)'),
     ('user', 'false', 'Start the nodes of the skills about the user (perception_user)'),
-    ('autostart_skills', '', 'Skills active from the start, "speaking,emotion"'),
+    ('body', 'true', 'Start the node of the skill body (perception_body): people, posture, '
+                     'falls, gestures, pointing'),
+    ('markers', 'true', 'Start the node of the skill markers (perception_markers): ArUco and '
+                        'AprilTag markers'),
+    ('autostart_skills', '', 'Skills active from the start, "lip_activity,facial_expression,body,markers"'),
     ('startup_requests', '', 'Detection requests opened on activation, without a class, '
                              '"name" or "name:output_namespace", comma-separated ("attention:/")'),
     ('orchestrator', 'true', 'Start the orchestrator (the perception tasks: TrackObject, '
-                             'WaitForObject, ObserveClass), which activates /perception_system'),
+                             'FollowPerson, MeasureWalk, WaitForObject, ObserveClass, '
+                             'WaitForGesture, WatchForFall), which activates /perception_system'),
     ('slots_per_behavior', '3', 'Orchestrator: goals of each task at the same time'),
     ('autostart', '', 'Configure and activate /perception_system by itself at start (default: '
                       'true without the orchestrator, false with it)'),
@@ -84,6 +91,41 @@ OVERRIDES = {
 
 def as_bool(text):
     return text.strip().lower() in ('true', '1', 'yes')
+
+
+def camera_parameters(files, overrides):
+    """The camera of the skill nodes (calibration, depth image, frames), from the parameters of
+    /perception_system: its files in order and the launch arguments."""
+    import yaml
+    merged = {}
+    for item in files:
+        if isinstance(item, dict):
+            merged.update(item)
+            continue
+        with open(item) as stream:
+            content = yaml.safe_load(stream) or {}
+        flat = {}
+
+        def flatten(prefix, value):
+            if isinstance(value, dict):
+                for key, child in value.items():
+                    flatten(f'{prefix}.{key}' if prefix else key, child)
+            else:
+                flat[prefix] = value
+        flatten('', (content.get('perception_system') or {}).get('ros__parameters') or {})
+        merged.update(flat)
+    out = {
+        'camera_info_topic': merged.get('projection.camera_info_topic', '/camera_info'),
+        'camera_frame_is_optical': bool(merged.get('projection.camera_frame_is_optical', True)),
+        'camera_frame_id': merged.get('projection.camera_frame_id', ''),
+        'fixed_frame_id': merged.get('fixed_frame_id', 'odom'),
+        'depth_image_topic': merged.get('projection.depth_image_topic', '')
+        if merged.get('projection.estimator') == 'depth_image' else '',
+    }
+    intrinsics = merged.get('projection.camera_intrinsics', [0.0])
+    if intrinsics and len(intrinsics) == 4:
+        out['camera_intrinsics'] = [float(v) for v in intrinsics]
+    return out
 
 
 def launch_setup(context):
@@ -132,6 +174,19 @@ def launch_setup(context):
                           name='emotion_detector', namespace='', output='screen',
                           parameters=[common], arguments=log),
         ]
+    skills = {'use_sim_time': overrides['use_sim_time'],
+              'image_topic': overrides.get('image_topic', '/image_rgb')}
+    skills.update(camera_parameters(parameters, overrides))
+    for enabled, package, executable in ((as_bool(arg('body')), 'perception_body',
+                                          'body_detector'),
+                                         (as_bool(arg('markers')), 'perception_markers',
+                                          'marker_detector')):
+        if enabled:
+            # The camera of the system, then the file of params_file (its own section, e.g.
+            # body_detector: ros__parameters: body: {floor_z: 0.0})
+            nodes.append(LifecycleNode(
+                package=package, executable=executable, name=executable, namespace='',
+                output='screen', parameters=[skills] + parameters[2:-1], arguments=log))
     if orchestrator:
         # Its runners publish on /behavior_status, which every koch2 runner of the
         # robot shares: remapped, so that other subsystems' orchestrators do not take their status

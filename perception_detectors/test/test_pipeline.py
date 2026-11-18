@@ -22,7 +22,7 @@ import torch
 from perception_detectors import backends, marking
 from perception_detectors.backends.color_blobs import color_of
 from perception_detectors.pipeline import DetectionPipeline
-from perception_detectors.tracking import StrongSortTracker, TRACKER_DEFAULTS
+from perception_detectors.tracking import StrongSortTracker, TRACKER_DEFAULTS, TRACKER_TYPES
 
 RED, BLUE, GREEN = (220, 20, 20), (20, 20, 220), (20, 200, 20)
 
@@ -94,7 +94,7 @@ def test_shared_model_output_is_not_modified(blobs):
     assert output[2] == copy[2]
 
 
-@pytest.mark.parametrize('tracker_type', ['bytetrack', 'strongsort'])
+@pytest.mark.parametrize('tracker_type', list(TRACKER_TYPES))
 def test_tracker_ids_confirmed_and_stable(blobs, tracker_type):
     params = dict(TRACKER_DEFAULTS, tracker_type=tracker_type, device='cpu')
     pipeline = DetectionPipeline(blobs, StrongSortTracker(params))
@@ -110,8 +110,25 @@ def test_tracker_ids_confirmed_and_stable(blobs, tracker_type):
     if tracker_type == 'strongsort':
         assert ids[0] == ['', '']
     confirmed = [i for i in ids if '' not in i]
-    assert confirmed and all(i == confirmed[0] for i in confirmed)
+    assert confirmed and all(i == confirmed[0] for i in confirmed), ids
     assert len(set(confirmed[0])) == 2
+
+
+@pytest.mark.parametrize('tracker_type', ['bytetrack', 'botsort', 'ocsort', 'deepocsort'])
+def test_each_tracker_numbers_its_own_tracks(blobs, tracker_type):
+    """Two requests with the same tracker: the ids of one do not depend on the other (the
+    trackers whose counter boxmot shares between instances keep their own)."""
+    params = dict(TRACKER_DEFAULTS, tracker_type=tracker_type, device='cpu')
+    first = DetectionPipeline(blobs, StrongSortTracker(params))
+    second = DetectionPipeline(blobs, StrongSortTracker(params))
+    first.set_class('red', '')
+    second.set_class('red', '')
+    for frame in range(8):
+        x = 20 + 4 * frame
+        both = scene([(x, 40, x + 40, 140, RED), (240 - x, 60, 280 - x, 160, RED)])
+        ids_first = sorted(d.id for d in first.process(both))
+        ids_second = sorted(d.id for d in second.process(both))
+    assert ids_first == ids_second and '' not in ids_first, (ids_first, ids_second)
 
 
 def test_marked_image_draws_only_tracked(blobs):

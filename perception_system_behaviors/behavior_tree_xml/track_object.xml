@@ -8,7 +8,8 @@
     Ports:            request (string, required): the name of its detection request;
                       frame_request (string, required): the name of its target frame request;
                       class (string, required); category (string, default "");
-                      model (string, default "": the default model);
+                      model, model_options, tracker (string, default "": the defaults of
+                      the system);
                       frame_id (string, required): the TF frame to publish;
                       selection (nearest | first, default nearest);
                       find_timeout_ms (int, required): how long to search at the start;
@@ -29,6 +30,7 @@
     <Sequence>
       <Script code="state:='SEARCHING'; id:=''"/>
       <StartDetection request="{request}" class="{class}" category="{category}" model="{model}"
+                      model_options="{model_options}" tracker="{tracker}"
                       outputs="3" detections_2d_topic="{topic_2d}"
                       detections_3d_topic="{topic_3d}"/>
       <Timeout msec="{find_timeout_ms}">

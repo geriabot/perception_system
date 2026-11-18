@@ -16,8 +16,12 @@ float32 find_timeout_s
 float32 lost_timeout_s
 # When the object is lost, track another object of the class instead of ending
 bool reacquire
-# The detection model (empty: the default)
+# The detection model (empty: the default of the system): omdet, grounding_dino, yolo,
+# yolo_world, sam3, color_blobs (docs/MODELS.md); its options, YAML (e.g. "{threshold: 0.35}")
 string model
+string model_options
+# The tracker (empty: the default): strongsort, bytetrack, botsort, ocsort, deepocsort
+string tracker
 ---
 # Why it ended: cancelled, not found, lost
 string reason

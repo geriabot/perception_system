@@ -1,10 +1,10 @@
 # Integrating the perception system
 
-A client chooses how to use it:
+A client chooses how to use it ([CATALOG.md](CATALOG.md) lists what to use for each need):
 
 | A client that... | Uses |
 |---|---|
-| needs a task done (follow an object, wait for one, frames on every object of a class) | the actions of `/perception_orchestrator` |
+| needs a task done (follow an object or a person, wait for one, frames on every object of a class, wait for a gesture, watch for a fall) | the actions of `/perception_orchestrator` |
 | has its own logic and consumes perception continuously | detection, target frame and skill requests on `/perception_system` |
 | asks a single question | `detect_once`, `get_objects` |
 | is a Behavior Tree | the plugin `perception_system_bt_nodes`, or the perception behaviors as subtrees ([BEHAVIOR_TREES.md](BEHAVIOR_TREES.md)) |
@@ -51,7 +51,22 @@ plugin_libraries:
 
 Or include a perception behavior as a subtree
 (`<include ros_pkg="perception_system_behaviors" path="behavior_tree_xml/track_object.xml"/>`),
-or call the actions from any node.
+or call the actions from any node. A behavior that reacts to people uses the skill `body`:
+
+```xml
+<Sequence>
+  <!-- Someone waves at the robot: go to them -->
+  <StartPerceptionSkill request="call_robot" skill="body"/>
+  <RetryUntilSuccessful num_attempts="-1">
+    <Sequence>
+      <Sleep msec="100"/>
+      <GestureSeen gesture="waving" person_frame="{caller}"/>
+    </Sequence>
+  </RetryUntilSuccessful>
+  <StopPerception request="call_robot"/>
+  <!-- ... navigate to {caller} ... -->
+</Sequence>
+```
 
 ## From Python
 
@@ -63,6 +78,8 @@ reply = client.start_detection('inventory', labels=['chair', 'table', 'tv'], mod
 client.start_target_frame('inventory_frames', 'inventory', 'furniture', '', mode=MODE_EACH)
 objects = client.objects('inventory', only_tracked=True).objects   # ids, classes, odom positions
 client.stop('inventory')
+
+client.start_skill('carer_body', 'body')   # then /people/body, /people/events, the body_<id> frames
 ```
 
 ## The attention system
@@ -126,15 +143,15 @@ The interaction system used `interaction_perception` through a topic and a servi
 
 | `interaction_perception` | `perception_system` |
 |---|---|
-| `lip_activity_detector` (always processing) | `/lip_activity_detector`, active while the skill `speaking` is requested: `start_skill` (`name: dialogue_lips`, `skill: speaking`), or `autostart_skills:=speaking` |
+| `lip_activity_detector` (always processing) | `/lip_activity_detector`, active while the skill `lip_activity` is requested: `start_skill` (`name: dialogue_lips`, `skill: lip_activity`), or `autostart_skills:=lip_activity` |
 | `/user_speaking` (`std_msgs/Bool`), `/lip_activity` | the same topics, the same classification |
 | `/interaction_perception/get_user_state` (`interaction_perception_msgs/srv/GetUserState`) | `/perception_system/get_user_state` (`perception_system_interfaces/srv/GetUserState`, the same fields) |
-| `emotion_detector` | `/emotion_detector`, skill `emotion` (experimental) |
+| `emotion_detector` | `/emotion_detector`, skill `facial_expression` (experimental) |
 | `interaction_perception.launch.py` | `perception_system.launch.py user:=true` |
 
 The steps: depend on `perception_system_interfaces` instead of `interaction_perception_msgs` in
 `interaction_intelligence`, set `user_state_service` to `/perception_system/get_user_state`,
-start the perception system with `user:=true autostart_skills:=speaking` (or request the skill when
+start the perception system with `user:=true autostart_skills:=lip_activity` (or request the skill when
 a dialogue starts and stop it when it ends, so that the lips are processed only while talking),
 and remove `interaction_perception/`.
 

@@ -15,23 +15,25 @@ file of `params_file`, and the launch arguments that are not empty
 | `model_options` | string | `""` | Its options, YAML (`"{threshold: 0.35}"`) |
 | `device` | string | `""` | Torch device of the models and the tracker; `""`: `cuda` if available |
 | `preload_model` | bool | `true` | Load the default model on activation |
-| `tracker` | string | `strongsort` | Default tracker of the requests: `strongsort`, `bytetrack` or `none` |
+| `tracker` | string | `strongsort` | Default tracker of the requests: `strongsort`, `bytetrack`, `botsort`, `ocsort`, `deepocsort` or `none` |
 | `zoom_small_detections` | bool | `false` | Add to `detections_image` a strip with the small detections enlarged (low-resolution cameras) |
 | `default_namespace` | string | `/perception_system/requests` | Namespace of the topics of a request without `output_namespace` |
 | `frames_namespace` | string | `/perception_system/frames` | Namespace of the topics of the target frames |
 | `fixed_frame_id` | string | `odom` | Default parent of the target frames, and frame of the positions of `get_objects` |
 | `tf_lookup_timeout_ms` | int | `1000` | How long to wait for the camera pose at the time of an image |
 | `frame_period_ms` | int | `100` | Period of each target frame's publisher (a frame is published once per new image) |
-| `skill_names`, `skill_nodes`, `skill_topics` | string[] | `speaking, emotion`; `lip_activity_detector, emotion_detector`; `"/user_speaking,/lip_activity", "/user_emotion"` | The skills: name, lifecycle node, topics (comma-separated) |
+| `skill_names`, `skill_nodes`, `skill_topics` | string[] | `lip_activity, facial_expression, body, markers`; `lip_activity_detector, emotion_detector, body_detector, marker_detector`; `"/user_speaking,/lip_activity", "/user_emotion", "/people/body,/people/events", "/markers/detections"` | The skills: name, lifecycle node, topics (comma-separated) |
 | `autostart_skills` | string[] | `[""]` | Skills active from activation |
-| `skill_timeout_s` | double | `10.0` | Timeout of the life-cycle calls to a skill node |
+| `skill_timeout_s` | double | `30.0` | Timeout of the life-cycle calls to a skill node (a skill node loads its model when it is configured) |
+| `follow.appearance` | string | `osnet` | `MODE_FOLLOW`: how an object is recognized again, `osnet` (the re-identification network of StrongSORT, `tracking.reid_weights`; people) or `color` (a hue histogram; colored objects, tests) |
+| `follow.min_similarity` | double | `0.0` | `MODE_FOLLOW`: the cosine similarity above which a detection is the followed object; `0`: the default of the appearance (0.7 for `osnet`, 0.85 for `color`) |
 | `user_speaking_topic`, `user_emotion_topic` | string | `/user_speaking`, `/user_emotion` | Read for `get_user_state` |
 | `startup_requests` | string[] | `[""]` | Detection requests opened on activation, without a class: `name` or `name:output_namespace` (`attention:/`) |
 | `status_period_s` | double | `1.0` | Period of `/perception_system/status` |
 | `stats_period_s` | double | `30.0` | Period of the speed in the log and the status |
 | `autostart` | bool | `false` | Configure and activate itself at start (the launch file sets it when there is no orchestrator) |
 
-### `tracking.*`: StrongSORT and ByteTrack
+### `tracking.*`: the trackers
 
 | Parameter | Type | Default | Meaning |
 |---|---|---|---|
@@ -118,3 +120,54 @@ The configuration of `mission_executor` is `perception_orchestrator/config/perce
 
 `/emotion_detector`: `image_topic`, `output_topic` (`/user_emotion`), `model_name`
 (`dima806/face_emotions_image_detection`), `min_detection_confidence` (0.5).
+
+The launch file gives `/body_detector` and `/marker_detector` the camera of `/perception_system`
+(`image_topic`, `camera_info_topic`, `camera_intrinsics`, `depth_image_topic` with the
+`depth_image` estimator, `camera_frame_is_optical`, `camera_frame_id`, `fixed_frame_id`), then
+their own section of `params_file`:
+
+```yaml
+body_detector:
+  ros__parameters:
+    body:
+      floor_z: 0.0
+      fall_confirm_s: 2.0
+marker_detector:
+  ros__parameters:
+    dictionary: DICT_APRILTAG_36h11
+    marker_size_m: 0.16
+```
+
+### `/body_detector`
+
+| Parameter | Type | Default | Meaning |
+|---|---|---|---|
+| `image_topic` | string | `/image_rgb` | The camera image |
+| `camera_info_topic`, `camera_intrinsics` | string, double[] | `/camera_info`, `[0.0]` | The calibration (or fixed `[fx, fy, cx, cy]`); without it, no 3D |
+| `depth_image_topic` | string | `""` | A depth image aligned with the color image; empty: the distance from the size of the body |
+| `camera_frame_is_optical`, `camera_frame_id` | bool, string | `true`, `""` | As in `projection.*` |
+| `fixed_frame_id`, `tf_lookup_timeout_ms` | string, int | `odom`, `200` | The frame of the positions and the TF frames, and how long to wait for the camera pose |
+| `model_id`, `device`, `imgsz`, `threshold` | string, string, int, double | `""` (`yolo11n-pose.pt`), `""`, `640`, `0.4` | The pose model |
+| `max_age` | int | `30` | Images a person's track survives without them (ByteTrack) |
+| `people_topic`, `events_topic`, `image_out_topic` | string | `/people/body`, `/people/events`, `/people/body_image` | The outputs |
+| `publish_tf`, `tf_prefix` | bool, string | `true`, `body` | The frames `<prefix>_<id>`, `_head`, `_pointed` |
+| `body.keypoint_threshold` | double | `0.5` | A keypoint with a lower score is not used |
+| `body.lying_torso_angle_deg`, `body.sitting_thigh_angle_deg`, `body.sitting_thigh_ratio`, `body.sitting_max_hip_height_m`, `body.posture_hold_s` | double | `55`, `50`, `0.5`, `0.7`, `0.5` | The posture |
+| `body.fall_confirm_s`, `body.fall_max_height_m`, `body.recover_s` | double | `1.0`, `0.6`, `1.0` | The fall |
+| `body.hand_raised_margin`, `body.pointing_elbow_angle_deg`, `body.pointing_min_elevation_deg`, `body.pointing_min_arm_ratio` | double | `0.3`, `150`, `40`, `0.6` | A raised hand, pointing |
+| `body.waving_window_s`, `body.waving_amplitude`, `body.waving_reversals` | double, double, int | `1.5`, `0.12`, `2` | Waving |
+| `body.gesture_hold_s`, `body.gesture_release_s` | double | `0.4`, `0.5` | When a gesture starts and ends |
+| `body.floor_z`, `body.max_pointing_m` | double | `0.0`, `8.0` | The floor in the fixed frame, and how far a pointed place may be |
+| `body.facing_asymmetry`, `body.torso_crop`, `body.forget_s` | double | `0.3`, `0.6`, `3.0` | Facing the camera, the part of the torso for the color, when a person not seen is forgotten |
+
+How they act: [BODY_PERCEPTION.md](BODY_PERCEPTION.md).
+
+### `/marker_detector`
+
+| Parameter | Type | Default | Meaning |
+|---|---|---|---|
+| `image_topic`, `camera_info_topic`, `camera_intrinsics`, `camera_frame_is_optical`, `camera_frame_id`, `fixed_frame_id`, `tf_lookup_timeout_ms` | | as `/body_detector` | The camera and the frames |
+| `dictionary` | string | `DICT_4X4_50` | `DICT_4X4_50`, `DICT_4X4_100`, `DICT_4X4_250`, `DICT_5X5_100`, `DICT_6X6_250`, `DICT_ARUCO_ORIGINAL`, `DICT_APRILTAG_16h5`, `DICT_APRILTAG_25h9`, `DICT_APRILTAG_36h10`, `DICT_APRILTAG_36h11` |
+| `marker_size_m`, `marker_sizes` | double, string[] | `0.10`, `[""]` | The side of the black square; other sizes, `"id:size_m"` |
+| `detections_topic`, `image_out_topic` | string | `/markers/detections`, `/markers/image` | The outputs |
+| `publish_tf`, `tf_prefix` | bool, string | `true`, `marker` | The frames `<prefix>_<id>` |

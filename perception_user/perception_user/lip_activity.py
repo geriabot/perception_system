@@ -6,7 +6,7 @@
 # system; the classification is unchanged.
 
 """lip_activity_detector: whether the user is speaking, from the movement of the lips (the skill
-"speaking" of the perception system).
+"lip_activity" of the perception system).
 
 MediaPipe FaceLandmarker gives the lip gap of the face, normalised by the height of the face. The
 detector computes the variance of the consecutive changes of the gap (roughness) over a short

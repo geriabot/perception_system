@@ -17,6 +17,7 @@
 import math
 
 from geometry_msgs.msg import Transform
+import numpy as np
 import pytest
 from vision_msgs.msg import Detection3D, Detection3DArray, ObjectHypothesisWithPose
 
@@ -126,3 +127,51 @@ def test_each_target_one_point_per_tracked_detection():
     every.update(message(('1', 'person', 0, 0, 2), ('2', 'chair', 2, 0, 2)))
     assert every.tracked_ids == ['1', '2']
     assert not every.update(message())
+
+
+# ---------------------------------------------------------------------- MODE_FOLLOW
+def scene(*boxes):
+    """An image with colored boxes, and their 2D detections: (id, color, x0, y0, x1, y1)."""
+    from perception_detectors.pipeline import Detection
+    image = np.full((240, 320, 3), 255, dtype=np.uint8)
+    detections = []
+    for det_id, color, x0, y0, x1, y1 in boxes:
+        image[y0:y1, x0:x1] = color
+        detections.append(Detection(cx=(x0 + x1) / 2, cy=(y0 + y1) / 2, w=x1 - x0, h=y1 - y0,
+                                     score=0.9, label='person', id=det_id))
+    return image, detections
+
+
+RED, BLUE = (220, 30, 30), (30, 30, 220)
+
+
+def follow_target(detection_id='1'):
+    from perception_system.appearance import ColorAppearance
+    return targets.FollowTarget('person', detection_id, ColorAppearance(), 0.85)
+
+
+def test_follow_recognizes_the_object_with_a_new_id():
+    target = follow_target()
+    # Seen with another person: that one is another object, even of the same appearance
+    target.observe(*scene(('1', RED, 10, 10, 60, 200), ('2', BLUE, 200, 10, 250, 200)))
+    assert target.others == {'2'}
+    assert target.update(message(('1', 'person', 0.0, 0.0, 2.0)))
+    assert target.tracked_ids == ['1']
+    # Lost: a new id of another appearance is not taken; one of its appearance is
+    assert target.observe(*scene(('2', BLUE, 200, 10, 250, 200),
+                                 ('5', BLUE, 100, 10, 150, 200))) is None
+    assert not target.update(message(('2', 'person', 1.0, 0.0, 2.0)))
+    assert target.tracked_ids == []
+    assert target.observe(*scene(('2', BLUE, 200, 10, 250, 200),
+                                 ('7', RED, 100, 10, 150, 200))) == '7'
+    assert target.detection_id == '7' and target.reidentifications == 1
+    assert target.update(message(('7', 'person', 0.5, 0.0, 3.0)))
+    assert target.take().z == pytest.approx(3.0)
+
+
+def test_follow_never_takes_an_object_seen_with_it():
+    target = follow_target()
+    target.observe(*scene(('1', RED, 10, 10, 60, 200), ('2', RED, 200, 10, 250, 200)))
+    # The same color, but seen at the same time: another object
+    assert target.observe(*scene(('2', RED, 200, 10, 250, 200))) is None
+    assert target.detection_id == '1'

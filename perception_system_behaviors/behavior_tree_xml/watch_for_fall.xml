@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<root BTCPP_format="4">
+  <!--
+    WatchForFall: watch the people in view until one of them is fallen on the floor (e.g. to
+    raise an alarm), with the skill "body" of the perception system.
+
+    Plugin libraries: libperception_system_bt_nodes.so (package perception_system_behaviors)
+    Needs:            the perception system (/perception_system) active, and its body detector
+    Ports:            request (string, required): the name of its skill request;
+                      timeout_ms (int, required)
+    Outputs:          person_id, person_frame (string): who is fallen and their TF frame;
+                      people (int): how many are in view
+    Result:           SUCCESS when someone is fallen; FAILURE after timeout_ms
+    Usage:            <SubTree ID="WatchForFall" request="fall_watch" timeout_ms="3600000"
+                               person_id="{who}" person_frame="{frame}"/>
+    The skill request stays open when the tree ends or is halted: end it with StopPerception
+    (request).
+  -->
+  <BehaviorTree ID="WatchForFall">
+    <Sequence>
+      <StartPerceptionSkill request="{request}" skill="body"/>
+      <Timeout msec="{timeout_ms}">
+        <RetryUntilSuccessful num_attempts="-1">
+          <Sequence>
+            <Sleep msec="200"/>
+            <PersonFallen person_id="{person_id}" person_frame="{person_frame}"
+                          people="{people}"/>
+          </Sequence>
+        </RetryUntilSuccessful>
+      </Timeout>
+    </Sequence>
+  </BehaviorTree>
+</root>

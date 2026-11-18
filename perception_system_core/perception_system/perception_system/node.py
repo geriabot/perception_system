@@ -18,8 +18,9 @@ Its clients (the behaviors of the robot, the attention system, the interaction s
 requests and close them; each request has its own outputs, so they do not interfere:
 
   ~/start_detection     StartDetection: detect and track a class in every image; its topics
-  ~/start_target_frame  StartTargetFrame: a TF frame at a tracked detection or a group
-  ~/start_skill         StartSkill: keep a skill node active (the user speaking, ...)
+  ~/start_target_frame  StartTargetFrame: a TF frame at a tracked detection, a group, every
+                        detection, or a detection followed by its appearance
+  ~/start_skill         StartSkill: keep a skill node active (the lips of the user, the body...)
   ~/stop                StopRequest: end a request by its name
   ~/detect_once         DetectOnce: the detections of a class in the next image
   ~/get_objects         GetObjects: what a detection request saw in its last image
@@ -53,7 +54,7 @@ from visualization_msgs.msg import MarkerArray
 
 from perception_detectors import marking
 from perception_detectors.tracking import TRACKER_DEFAULTS
-from perception_system import projection, requests as rq, targets, transforms
+from perception_system import appearance, projection, requests as rq, targets, transforms
 from perception_system.engine import LocalEngine, RemoteEngine, RequestConfig
 from perception_system.skills import SkillManager
 from perception_system_interfaces.msg import PerceptionStatus, RequestStatus, TrackedObject, \
@@ -89,7 +90,7 @@ class PerceptionSystem(LifecycleNode):
             ('model', 'omdet'),
             ('model_options', ''),                 # YAML
             ('device', ''),                        # '' = cuda if available
-            ('tracker', 'strongsort'),             # strongsort | bytetrack | none
+            ('tracker', 'strongsort'),             # one of engine.TRACKERS
             ('preload_model', True),
             ('zoom_small_detections', False),
             ('default_namespace', '/perception_system/requests'),
@@ -97,11 +98,13 @@ class PerceptionSystem(LifecycleNode):
             ('fixed_frame_id', 'odom'),
             ('tf_lookup_timeout_ms', 1000),
             ('frame_period_ms', 100),
-            ('skill_names', ['speaking', 'emotion']),
-            ('skill_nodes', ['lip_activity_detector', 'emotion_detector']),
-            ('skill_topics', ['/user_speaking,/lip_activity', '/user_emotion']),
+            ('skill_names', ['lip_activity', 'facial_expression', 'body', 'markers']),
+            ('skill_nodes', ['lip_activity_detector', 'emotion_detector', 'body_detector',
+                             'marker_detector']),
+            ('skill_topics', ['/user_speaking,/lip_activity', '/user_emotion',
+                              '/people/body,/people/events', '/markers/detections']),
             ('autostart_skills', ['']),
-            ('skill_timeout_s', 10.0),
+            ('skill_timeout_s', 30.0),
             ('user_speaking_topic', '/user_speaking'),
             ('user_emotion_topic', '/user_emotion'),
             ('status_period_s', 1.0),
@@ -114,6 +117,10 @@ class PerceptionSystem(LifecycleNode):
         self.declare_parameters('tracking', list(TRACKER_PARAMETERS.items()))
         self.declare_parameters('remote', list(REMOTE_DEFAULTS.items()))
         self.declare_parameters('projection', list(projection.DEFAULTS.items()))
+        # Target frames in MODE_FOLLOW: the appearance (osnet or color) and the similarity above
+        # which a detection is the followed object (0: the default of the appearance)
+        self.declare_parameters('follow', [('appearance', 'osnet'), ('min_similarity', 0.0)])
+        self.appearance = None
 
         self.bridge = CvBridge()
         self.lock = threading.RLock()
@@ -373,11 +380,14 @@ class PerceptionSystem(LifecycleNode):
             rq.check_name(request.name)
             if not request.frame_id:
                 raise rq.RequestError('frame_id is empty')
-            if request.mode not in (rq.MODE_SINGLE, rq.MODE_GROUP, rq.MODE_EACH):
-                raise rq.RequestError(f'Invalid mode {request.mode}: 0 (single), 1 (group) or '
-                                      '2 (each)')
-            if request.mode == rq.MODE_SINGLE and not request.id:
-                raise rq.RequestError('MODE_SINGLE needs the id of the detection')
+            if request.mode not in (rq.MODE_SINGLE, rq.MODE_GROUP, rq.MODE_EACH,
+                                    rq.MODE_FOLLOW):
+                raise rq.RequestError(f'Invalid mode {request.mode}: 0 (single), 1 (group), '
+                                      '2 (each) or 3 (follow)')
+            if request.mode in (rq.MODE_SINGLE, rq.MODE_FOLLOW) and not request.id:
+                raise rq.RequestError('MODE_SINGLE and MODE_FOLLOW need the id of the detection')
+            if request.mode == rq.MODE_FOLLOW and self.appearance is None:
+                self.appearance = self.make_appearance()
             with self.lock:
                 source = self.requests.get(request.detection_request)
                 if not isinstance(source, rq.DetectionRequest) or source.internal:
@@ -414,6 +424,13 @@ class PerceptionSystem(LifecycleNode):
             request.half_width_topic or f'{namespace}/half_width')
         if frame.mode == rq.MODE_SINGLE:
             frame.target = targets.SingleTarget(frame.class_name, frame.detection_id)
+        elif frame.mode == rq.MODE_FOLLOW:
+            name = self.p('follow.appearance')
+            frame.target = targets.FollowTarget(
+                frame.class_name, frame.detection_id, self.appearance,
+                self.p('follow.min_similarity') or appearance.DEFAULT_MIN_SIMILARITY[name])
+            frame.publishers = {'tracked_ids': self.create_publisher(
+                Detection2DArray, f'{namespace}/tracked_ids', 10)}
         elif frame.mode == rq.MODE_EACH:
             frame.target = targets.EachTarget(frame.class_name)
         else:
@@ -432,6 +449,17 @@ class PerceptionSystem(LifecycleNode):
         if frame.mode == rq.MODE_GROUP:
             self.publish_tracked_ids(frame)
         return frame
+
+    def make_appearance(self):
+        """The appearance model of MODE_FOLLOW, loaded with the first request that needs it."""
+        name = self.p('follow.appearance')
+        try:
+            model = appearance.make_appearance(name, self.p('tracking.reid_weights'),
+                                               self.p('device'))
+        except Exception as exc:  # noqa: B902 - the reason goes back to the client
+            raise rq.RequestError(f'Cannot load the appearance model {name}: {exc}') from exc
+        self.get_logger().info(f'Appearance for MODE_FOLLOW: {name}')
+        return model
 
     def on_start_skill(self, request, response):
         try:
@@ -498,6 +526,9 @@ class PerceptionSystem(LifecycleNode):
             self.destroy_timer(request.timer)
             if request.mode == rq.MODE_GROUP:
                 request.target.reset()
+                self.publish_tracked_ids(request)
+            elif request.mode == rq.MODE_FOLLOW:
+                request.target.single.seen = False
                 self.publish_tracked_ids(request)
             self.destroy_publishers(request)
             source = self.requests.get(request.source)
@@ -614,7 +645,10 @@ class PerceptionSystem(LifecycleNode):
             request.markers = len(detections_3d.detections)
         if detections_3d is not None:
             for frame_name in request.frames:
-                self.update_frame(self.requests[frame_name], detections_3d)
+                frame = self.requests[frame_name]
+                if frame.mode == rq.MODE_FOLLOW and image is not None:
+                    frame.target.observe(image, detections, self.get_logger().info)
+                self.update_frame(frame, detections_3d)
         if request.internal:
             self.fulfil_once(request.name, (detections_2d, detections_3d))
             return
@@ -655,6 +689,8 @@ class PerceptionSystem(LifecycleNode):
         frame.target.update(detections_3d, log)
         if frame.mode == rq.MODE_GROUP and frame.target.half_width is not None:
             frame.publishers['half_width'].publish(Float64(data=frame.target.half_width))
+        if frame.mode == rq.MODE_FOLLOW:
+            self.publish_tracked_ids(frame, detections_3d.header.frame_id)
 
     def camera_pose(self, fixed_frame_id, camera_frame_id, stamp_msg, timeout_ms):
         """The transform fixed <- camera at the time of an image, or None (logged)."""

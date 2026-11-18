@@ -1,0 +1,58 @@
+<?xml version="1.0"?>
+<root BTCPP_format="4">
+  <!--
+    MeasureWalk: how fast a person walks (a gait speed test). Find them, follow them (recognized
+    again by their appearance if the tracker loses them), wait until they start walking, and
+    measure the time they take to walk a distance (or how far they walk in a time).
+
+    Plugin libraries: libperception_system_bt_nodes.so (package perception_system_behaviors)
+    Needs:            the perception system (/perception_system) active, with 3D placement
+    Ports:            request (string, required): the name of its detection request;
+                      frame_request (string, required): the name of its target frame request;
+                      class (string, required: person); category (string, default "");
+                      model, model_options, tracker (string, default "": the defaults of
+                      the system);
+                      frame_id (string, required): the TF frame to publish on them;
+                      selection (nearest | first, default nearest): who, at the start;
+                      find_timeout_ms (int, required): how long to search at the start;
+                      start_distance (double, m): how far they move to have started;
+                      distance (double, m; 0: no limit), duration_ms (int; 0: no limit);
+                      lost_timeout_ms (int, required): how long they may be out of view
+    Outputs:          id (string): their tracker id at the start; state (SEARCHING |
+                      WAITING_START | WALKING); walked (m), elapsed (s), speed (m/s),
+                      start_time, end_time (s, the times of the images)
+    Result:           SUCCESS when they have walked the distance (or the time has passed);
+                      FAILURE if nobody is found within find_timeout_ms, or they are not seen
+                      for lost_timeout_ms
+    Usage:            <SubTree ID="MeasureWalk" request="gait" frame_request="gait_frame"
+                               class="person" category="" model="" model_options="" tracker=""
+                               frame_id="patient" selection="nearest" find_timeout_ms="20000"
+                               start_distance="0.2" distance="4.0" duration_ms="0"
+                               lost_timeout_ms="3000" speed="{speed}" elapsed="{time}"/>
+    The requests stay open when the tree ends or is halted: end them with StopPerception
+    (request; its target frame ends with it).
+  -->
+  <BehaviorTree ID="MeasureWalk">
+    <Sequence>
+      <Script code="state:='SEARCHING'; id:=''"/>
+      <StartDetection request="{request}" class="{class}" category="{category}" model="{model}"
+                      model_options="{model_options}" tracker="{tracker}"
+                      outputs="3" detections_3d_topic="{topic_3d}"/>
+      <Timeout msec="{find_timeout_ms}">
+        <RetryUntilSuccessful num_attempts="-1">
+          <Sequence>
+            <Sleep msec="100"/>
+            <SelectDetection topic="{topic_3d}" class="{class}" policy="{selection}" id="{id}"/>
+          </Sequence>
+        </RetryUntilSuccessful>
+      </Timeout>
+      <StartTargetFrame request="{frame_request}" detection_request="{request}"
+                        frame_id="{frame_id}" class="{class}" id="{id}" mode="follow"/>
+      <MeasureDisplacement frame="{frame_id}" start_distance="{start_distance}"
+                           distance="{distance}" duration_ms="{duration_ms}"
+                           lost_timeout_ms="{lost_timeout_ms}" state="{state}"
+                           walked="{walked}" elapsed="{elapsed}" speed="{speed}"
+                           start_time="{start_time}" end_time="{end_time}"/>
+    </Sequence>
+  </BehaviorTree>
+</root>

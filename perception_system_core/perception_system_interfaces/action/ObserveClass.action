@@ -9,8 +9,12 @@ string category
 string[] labels
 # The prefix of the frames. Empty: the class name (with _ for spaces), or "object" for labels
 string frame_prefix
-# The detection model (empty: the default)
+# The detection model (empty: the default of the system): omdet, grounding_dino, yolo,
+# yolo_world, sam3, color_blobs (docs/MODELS.md); its options, YAML (e.g. "{threshold: 0.35}")
 string model
+string model_options
+# The tracker (empty: the default): strongsort, bytetrack, botsort, ocsort, deepocsort
+string tracker
 ---
 string reason
 ---

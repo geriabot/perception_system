@@ -4,7 +4,7 @@
 # Licensed under the MIT License (LICENSE.MIT of this package). Ported from the emotion detector
 # of interaction_system (interaction_perception), as a lifecycle node.
 
-"""emotion_detector: the facial expression of the user (the skill "emotion" of the perception
+"""emotion_detector: the facial expression of the user (the skill "facial_expression" of the perception
 system). EXPERIMENTAL, NOT VALIDATED.
 
 The largest face of each image (MediaPipe FaceDetector) is classified by a Hugging Face image

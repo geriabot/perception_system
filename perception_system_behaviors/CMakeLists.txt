@@ -10,6 +10,9 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(behaviortree_cpp REQUIRED)
 find_package(vision_msgs REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_ros REQUIRED)
+find_package(geometry_msgs REQUIRED)
 find_package(perception_system_interfaces REQUIRED)
 
 # One plugin with every node: load it with the name perception_system_bt_nodes
@@ -22,6 +25,9 @@ target_link_libraries(perception_system_bt_nodes PUBLIC
   rclcpp::rclcpp
   behaviortree_cpp::behaviortree_cpp
   ${vision_msgs_TARGETS}
+  ${geometry_msgs_TARGETS}
+  tf2::tf2
+  tf2_ros::tf2_ros
   ${perception_system_interfaces_TARGETS})
 
 install(TARGETS perception_system_bt_nodes
@@ -43,5 +49,6 @@ endif()
 
 ament_export_include_directories(include/${PROJECT_NAME})
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
-ament_export_dependencies(rclcpp behaviortree_cpp vision_msgs perception_system_interfaces)
+ament_export_dependencies(rclcpp behaviortree_cpp vision_msgs geometry_msgs tf2 tf2_ros
+  perception_system_interfaces)
 ament_package()

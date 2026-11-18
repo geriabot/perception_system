@@ -1,8 +1,10 @@
 # Keeps a skill of the perception system active (its node is activated with the first request
 # and deactivated after the last one ends). The skills, their nodes and topics are configured in
 # the perception system (parameters skill_names, skill_nodes, skill_topics).
-#   speaking   whether the user is speaking, from the lips (/user_speaking, std_msgs/Bool)
-#   emotion    the facial emotion of the user (experimental, not validated)
+#   lip_activity       whether the lips of the user move as in speech (/user_speaking, std_msgs/Bool)
+#   facial_expression  the facial expression of the user (experimental, not validated)
+#   body               the people: keypoints, posture, falls, gestures, pointing (/people/body)
+#   markers            ArUco and AprilTag markers and their pose (/markers/detections)
 
 # The name of the request (unique among the clients)
 string name

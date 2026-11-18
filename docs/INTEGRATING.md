@@ -21,6 +21,11 @@ Rules for every client:
 - **Stamps.** Detections and target frames carry the time of the image: combine them with the
   robot's pose at that time (`lookupTransform` at the stamp), or with the latest one when the
   delay does not matter.
+- **Launching it from another launch file.** Launch arguments are shared by every launch file
+  included in the same launch: an `image_topic`, `params_file` or `model` of another one (the
+  TurtleBot 4's declares `image_topic`) would reach `perception_system.launch.py`. Include it in a
+  scoped group without forwarding, with its arguments explicit:
+  `GroupAction([IncludeLaunchDescription(...)], scoped=True, forwarding=False)`.
 
 ## From a behavior of the robot
 

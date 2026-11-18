@@ -12,4 +12,4 @@ repositories:
   third_party/koch2:
     type: git
     url: https://github.com/geriabot/koch2.git
-    version: b69a975718a893d8ab91d36cc92d49ea27610e0f
+    version: a0e632b084c768f11d1493a01fa6c215f44526f1

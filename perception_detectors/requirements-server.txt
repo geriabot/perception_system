@@ -1,0 +1,14 @@
+# Python packages of the perception server (a computer with an NVIDIA GPU, no ROS needed).
+# Same versions as the robot side (requirements.txt of the repository) for omdet and
+# grounding_dino. See docs/PERCEPTION_SERVER.md.
+torch==2.7.0
+torchvision==0.22.0
+transformers==4.56.2
+timm==1.0.20          # backbone of OMDet Turbo
+boxmot==16.0.11
+opencv-python-headless<5
+numpy
+pillow
+pyyaml
+# sam3: installed separately (Python >= 3.12, its own torch), see docs/PERCEPTION_SERVER.md
+# yolo, yolo_world (optional, AGPL-3.0): pip install ultralytics
